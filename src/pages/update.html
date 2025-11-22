@@ -369,35 +369,34 @@
   </style>
 
       <!-- SCRIPT FOR AUTO-FILL -->
-      <script>
-  const params = new URLSearchParams(window.location.search);
+<script>
+document.querySelectorAll(".submit-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
 
-  const broker = params.get("broker") || "";
-  const brokerId = params.get("id") || "";
-  const load = params.get("load") || "";
+        const userId = new URLSearchParams(window.location.search).get("user");
 
-  // Load Report
-  document.getElementById("autoBroker").textContent = broker;
-  document.getElementById("autoBrokerId").textContent = brokerId;
+        const payload = {
+            userId,
+            broker,
+            brokerId,
+            load,
+            emptyTrailer: document.getElementById("emptyTrailer")?.value,
+            puLocation: document.getElementById("puLocation")?.value,
+            puCheckIn: document.getElementById("puCheckIn")?.value,
+            puCheckOut: document.getElementById("puCheckOut")?.value,
+        };
 
-  // SHIPPER PICKUP FORM
-  document.getElementById("brokerNameDisplay").textContent = broker;
-  document.getElementById("brokerIdDisplay").textContent = brokerId;
-
-  // AGAR boshqa formaga ham broker kerak bo'lsa shu yerga qo‘shamiz:
-  if (document.getElementById("fullBrokerDisplay")) {
-      document.getElementById("fullBrokerDisplay").textContent = broker;
-  }
-
-  if (document.getElementById("fullBrokerIdDisplay")) {
-      document.getElementById("fullBrokerIdDisplay").textContent = brokerId;
-  }
-
-  function showForm(id) {
-    document.querySelectorAll(".hidden-form").forEach(f => f.style.display = "none");
-    document.getElementById(id).style.display = "block";
-  }
+        fetch("http://localhost:400/send-report", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }).then(() => {
+            alert("Successfully submitted!");
+        });
+    });
+});
 </script>
+
 
     </body>
   </html>
