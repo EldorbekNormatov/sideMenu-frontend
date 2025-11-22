@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>NAVGINX — Load Forms</title>
+
+    <style>
+    .hidden-form { display: none; }
+    .fade { animation: fadeIn 0.35s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px);} to {opacity: 1; transform: translateY(0);} }
+  </style>
+  </head>
+
+  <body class="bg-[#0D1117] text-white min-h-screen p-4">
+
+    <div class="max-w-xl mx-auto">
+
+      <!-- BACK BUTTON -->
+      <div class="mb-4">
+        <a href="index.html"
+          class="inline-block bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg shadow-md transition">
+          ⬅️ Home
+        </a>
+      </div>
+
+      <h1 class="text-3xl font-bold text-center mb-6 tracking-wide">🚚 Load
+        Forms Center</h1>
+
+      <!-- BUTTONS -->
+      <div class="grid grid-cols-2 gap-4 mb-8">
+        <button onclick="showForm('loadReport')"
+          class="btn bg-blue-600 hover:bg-blue-700">Load Report</button>
+        <button onclick="showForm('shipperPickup')"
+          class="btn bg-green-600 hover:bg-green-700">Shipper Pick-up</button>
+        <button onclick="showForm('receiverDelivery')"
+          class="btn bg-purple-600 hover:bg-purple-700">Receiver
+          Delivery</button>
+        <button onclick="showForm('receiverFullPod')"
+          class="btn bg-yellow-500 hover:bg-yellow-400 text-black">POD Full
+          Delivery</button>
+      </div>
+
+      <script>
+      document.querySelectorAll(".btn").forEach(btn => {
+        btn.classList.add("py-3","rounded-xl","font-semibold","shadow-md","hover:shadow-xl","transition-all");
+      });
+    </script>
+
+      <!-- =======================================
+            LOAD REPORT FORM
+    ======================================== -->
+      <!-- ========== LOAD REPORT ========== -->
+      <div id="loadReport" class="hidden-form fade form-box">
+
+        <h2 class="title">Load Report</h2>
+
+        <!-- Broker & ID (auto-filled, no input) -->
+        <div class="bg-[#1F242D] p-3 rounded-lg border border-gray-700 mb-3">
+          <p class="font-semibold text-blue-400">Broker: <span
+              id="autoBroker"></span></p>
+          <p class="font-semibold text-blue-400">ID#: <span
+              id="autoBrokerId"></span></p>
+        </div>
+
+        <!-- EMPTY TRAILER -->
+        <div>
+          <label class="label">EMPTY TRAILER #</label>
+          <input id="emptyTrailer" class="input" placeholder="bobtail in">
+        </div>
+
+        <hr class="divider">
+
+        <!-- Shipper Pick-up -->
+        <label class="label">♻️ SHIPPER PICK-UP Location</label>
+        <textarea id="puLocation" class="textarea"
+          placeholder="Palmetto, GA 30268"></textarea>
+
+        <div class="flex gap-4">
+          <div class="w-1/2">
+            <label class="label">Check-in</label>
+            <input id="puCheckIn" type="time" class="input">
+          </div>
+          <div class="w-1/2">
+            <label class="label">Check-out</label>
+            <input id="puCheckOut" type="time" class="input">
+          </div>
+        </div>
+
+        <div>
+          <label class="label">Preloaded Trailer #</label>
+          <input id="preloadedTrailer" class="input" placeholder="TA156396">
+        </div>
+
+        <hr class="divider">
+
+        <h3 class="font-bold text-lg">📄 BILL OF LADING (BOL)</h3>
+
+        <label class="check"><input id="bolMatch" type="checkbox"> Shipper &
+          Receiver Matches</label>
+        <label class="check"><input id="bolSeal" type="checkbox"> Seal intact &
+          matches</label>
+        <label class="check"><input id="bolPages" type="checkbox"> With all
+          pages & Clear</label>
+
+        <hr class="divider">
+
+        <!-- Trailer & Tracking -->
+        <label class="check"><input id="trailerImages" type="checkbox"> Trailer
+          & Seal Images</label>
+        <label class="check"><input id="tracking" type="checkbox"> 📲📍App &
+          Tracking</label>
+
+        <button class="submit-btn bg-blue-600 hover:bg-blue-500">Submit</button>
+
+      </div>
+
+      <!-- =======================================
+            SHIPPER PICKUP FORM
+    ======================================== -->
+      <div id="shipperPickup" class="hidden-form fade form-box">
+
+        <h2 class="title">Shipper Pick-up</h2>
+
+        <!-- 🔵 LOAD INFO (readonly) -->
+        <label class="label">Broker</label>
+        <div id="brokerNameDisplay" class="readonly-box"></div>
+
+        <label class="label">ID#</label>
+        <div id="brokerIdDisplay" class="readonly-box"></div>
+
+        <hr class="divider">
+
+        <h3 class="font-bold text-lg">♻️ SHIPPER PICK-UP</h3>
+
+        <!-- Location -->
+        <label class="label">Location</label>
+        <textarea id="sp_location" class="textarea"
+          placeholder="Gooding, ID 83330"></textarea>
+
+        <!-- Check-in/out -->
+        <div class="flex gap-4">
+          <div class="w-1/2">
+            <label class="label">Check-in</label>
+            <input id="sp_checkin" type="time" class="input">
+          </div>
+
+          <div class="w-1/2">
+            <label class="label">Check-out</label>
+            <input id="sp_checkout" type="time" class="input">
+          </div>
+        </div>
+
+        <!-- Trailer -->
+        <label class="label">Trailer#</label>
+        <input id="sp_trailer" class="input" placeholder="445130">
+
+        <hr class="divider">
+
+        <h3 class="font-bold text-lg">📄 BILL OF LADING (BOL)</h3>
+
+        <label class="check"><input id="sp_match" type="checkbox"> Shipper &
+          Receiver Matches</label>
+        <label class="check"><input id="sp_pages" type="checkbox"> With all
+          pages & Clear</label>
+        <label class="check"><input id="sp_seal" type="checkbox"> Seal intact &
+          matches</label>
+
+        <hr class="divider">
+
+        <!-- Load secured image -->
+        <label class="label">Load Secured Image</label>
+        <select id="sp_loadSecured" class="input">
+          <option value="yes">Yes</option>
+          <option value="no" selected>No</option>
+        </select>
+
+        <!-- SEPARATED FIELDS -->
+        <label class="label mt-4">Status Updated</label>
+        <input id="sp_statusUpdated" class="input"
+          placeholder="Example: Updated on 11/14">
+
+        <label class="label mt-3">GTG by Broker</label>
+        <input id="sp_gtg" class="input" placeholder="GTG by Broker">
+
+        <button
+          class="submit-btn bg-green-600 hover:bg-green-500">Submit</button>
+      </div>
+
+      <!-- =======================================
+            RECEIVER DELIVERY
+    ======================================== -->
+      <!-- RECEIVER DELIVERY FORM -->
+      <div id="receiverDelivery" class="hidden-form fade form-box">
+
+        <h2 class="title">Receiver Delivery</h2>
+
+        <!-- 📍 LOCATION -->
+        <label class="label">🏁 RECEIVER DELIVERY Location:</label>
+        <textarea
+          class="textarea"
+          placeholder="Fort Pierce, FL 34981"></textarea>
+
+        <!-- TIME INPUTS -->
+        <div class="flex gap-4">
+          <div class="w-1/2">
+            <label class="label">Check-in</label>
+            <input type="time" class="input">
+          </div>
+
+          <div class="w-1/2">
+            <label class="label">Check-out</label>
+            <input type="time" class="input">
+          </div>
+        </div>
+
+        <!-- DROPPED TRAILER -->
+        <div>
+          <label class="label">Dropped Trailer #</label>
+          <input
+            type="text"
+            class="input"
+            placeholder="TA156396">
+        </div>
+
+        <hr class="divider">
+
+        <!-- POD SECTION -->
+        <h3 class="font-bold text-lg">📝 PROOF OF DELIVERY (POD):</h3>
+
+        <label class="check"><input type="checkbox"> Seal intact</label>
+        <label class="check"><input type="checkbox"> OS&D (Over, Short and
+          Damage)</label>
+        <label class="check"><input type="checkbox"> Signature or Stamp</label>
+        <label class="check"><input type="checkbox"> With all pages &
+          Clear</label>
+
+        <label class="check"><input type="checkbox"> Trailer & Seal
+          Images</label>
+        <label class="check"><input type="checkbox"> 📲📍 App & Tracking</label>
+
+        <hr class="divider">
+
+        <!-- EMPTY TRAILER PICKUP -->
+        <div>
+          <label class="label">🚛 Empty trailer # picked up from
+            RECEIVER</label>
+          <input
+            type="text"
+            class="input"
+            placeholder="TA159020">
+        </div>
+
+        <!-- DROP-OFF LOCATION -->
+        <div>
+          <label class="label">📍 Drop-off location for empty trailer</label>
+          <textarea
+            class="textarea"
+            placeholder="Location..."></textarea>
+        </div>
+
+        <!-- SUBMIT -->
+        <button
+          class="submit-btn bg-purple-600 hover:bg-purple-500">Submit</button>
+      </div>
+
+      <!-- =======================================
+            FULL POD DELIVERY
+    ======================================== -->
+      <div id="receiverFullPod" class="hidden-form fade form-box">
+
+        <h2 class="title">Full POD Delivery</h2>
+
+        <!-- RECEIVER DELIVERY -->
+        <label class="label">🏁 RECEIVER DELIVERY — Location</label>
+        <textarea placeholder="Pasadena, TX 77507" class="textarea"></textarea>
+
+        <div class="flex gap-4 mt-2">
+          <div class="w-1/2">
+            <label class="label">Check-in</label>
+            <input type="time" class="input">
+          </div>
+
+          <div class="w-1/2">
+            <label class="label">Check-out</label>
+            <input type="time" class="input">
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- POD SECTION -->
+        <h3 class="font-bold text-lg mb-1">📝 PROOF OF DELIVERY (POD)</h3>
+
+        <label class="check"><input type="checkbox"> Seal intact</label>
+        <label class="check"><input type="checkbox"> OS&D (Over, Short and
+          Damage)</label>
+        <label class="check"><input type="checkbox"> Signature or Stamp</label>
+        <label class="check"><input type="checkbox"> Date on POD</label>
+        <label class="check"><input type="checkbox"> With all pages &
+          Clear</label>
+
+        <hr class="divider">
+
+        <!-- STATUS UPDATED -->
+        <div class="mt-4">
+          <label class="label font-semibold">Status Updated</label>
+          <input
+            id="statusUpdated"
+            class="input"
+            placeholder="Status Updated..." />
+        </div>
+
+        <!-- GTG by Broker -->
+        <div class="mt-4">
+          <label class="label font-semibold">GTG by Broker</label>
+          <input
+            id="gtgBroker"
+            class="input"
+            placeholder="GTG by Broker" />
+        </div>
+
+        <hr class="divider">
+
+        <!-- NOTES -->
+        <label class="label">📝 Notes</label>
+        <textarea class="textarea" placeholder="Additional notes..."></textarea>
+
+        <button class="submit-btn bg-yellow-400 hover:bg-yellow-300 text-black">
+          Submit
+        </button>
+
+      </div>
+
+      <!-- =======================================
+         GLOBAL STYLE
+  ======================================== -->
+      <style>
+    .form-box {
+      background:#161B22; padding:20px; border-radius:14px;
+      border:1px solid rgba(255,255,255,0.1);
+      margin-bottom:25px; box-shadow:0 8px 25px rgba(0,0,0,0.4);
+    }
+    .title { text-align:center; font-size:24px; font-weight:700; margin-bottom:15px; }
+    .label { font-size:14px; font-weight:600; margin-bottom:4px; display:block; }
+    .input {
+      width:100%; padding:10px; border-radius:8px; background:#1F242D;
+      border:1px solid #374151; outline:none; transition:.2s;
+    }
+    .input:focus { border-color:#3B82F6; }
+    .textarea {
+      width:100%; padding:10px; border-radius:8px; height:65px;
+      background:#1F242D; border:1px solid #374151;
+    }
+    .readonly-box {
+      width:100%; padding:12px; background:#1F242D;
+      border:1px solid #374151; border-radius:8px;
+      opacity:.85; cursor:not-allowed;
+    }
+    .divider { border-color:#374151; margin:14px 0; }
+    .check { display:flex; gap:8px; margin:4px 0; }
+    .submit-btn {
+      width:100%; padding:12px; margin-top:10px; border-radius:10px;
+      font-weight:600; transition:.25s;
+      box-shadow:0 4px 12px rgba(0,0,0,0.4);
+    }
+    .submit-btn:hover { transform:scale(1.02); }
+  </style>
+
+      <!-- SCRIPT FOR AUTO-FILL -->
+      <script>
+  const params = new URLSearchParams(window.location.search);
+
+  const broker = params.get("broker") || "";
+  const brokerId = params.get("id") || "";
+  const load = params.get("load") || "";
+
+  // Load Report
+  document.getElementById("autoBroker").textContent = broker;
+  document.getElementById("autoBrokerId").textContent = brokerId;
+
+  // SHIPPER PICKUP FORM
+  document.getElementById("brokerNameDisplay").textContent = broker;
+  document.getElementById("brokerIdDisplay").textContent = brokerId;
+
+  // AGAR boshqa formaga ham broker kerak bo'lsa shu yerga qo‘shamiz:
+  if (document.getElementById("fullBrokerDisplay")) {
+      document.getElementById("fullBrokerDisplay").textContent = broker;
+  }
+
+  if (document.getElementById("fullBrokerIdDisplay")) {
+      document.getElementById("fullBrokerIdDisplay").textContent = brokerId;
+  }
+
+  function showForm(id) {
+    document.querySelectorAll(".hidden-form").forEach(f => f.style.display = "none");
+    document.getElementById(id).style.display = "block";
+  }
+</script>
+
+    </body>
+  </html>

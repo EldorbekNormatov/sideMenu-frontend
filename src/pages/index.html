@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <title>NAVGINX</title>
+
+  <style>
+    body { animation: fadeIn .5s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .panel {
+      width: 100%;
+      max-width: 480px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+  </style>
+</head>
+
+<body class="bg-[#0D1117] text-white min-h-screen">
+
+  <div class="min-h-screen flex items-start justify-center pt-6">
+
+    <div class="panel bg-[#161B22]/80 border border-gray-700 rounded-2xl 
+                shadow-[0_8px_30px_rgba(0,0,0,0.45)] p-6">
+
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold tracking-wide">NAVGINX</h1>
+      </div>
+
+      <div class="text-center mb-4">
+        <img src="https://cdn-icons-png.flaticon.com/512/4712/4712139.png"
+             class="w-20 h-20 mx-auto rounded-full shadow-lg ring-2 ring-gray-700" />
+
+        <h2 class="text-xl font-semibold mt-3">Your Panel</h2>
+
+        <!-- GROUP NAME HERE -->
+        <p id="groupName" class="text-blue-400 font-semibold text-lg mt-1"></p>
+
+        <p class="text-gray-400 text-sm">Manage groups, shipments and history</p>
+      </div>
+
+      <div class="relative mb-6">
+        <input type="text" id="menuSearch" placeholder="Search"
+          class="w-full bg-[#1F242B] text-white p-3 pl-10 rounded-lg border 
+                 border-gray-700 focus:ring-2 focus:ring-blue-500 outline-none transition"
+          oninput="filterMenu()" />
+
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="w-5 h-5 absolute left-3 top-3.5 text-gray-400"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-4.35-4.35m1.05-5.4A7.5 7.5 0 1110.5 3a7.5 7.5 0 017.2 9.25z" />
+        </svg>
+      </div>
+
+      <p class="text-gray-400 uppercase text-sm tracking-wider mb-3">Menu</p>
+
+      <div id="menuList" class="space-y-3">
+
+        <!-- UPDATE BUTTON WITH QUERY PARAMS -->
+        <a id="updateLink"
+           class="menu-item bg-[#1F242B]/80 hover:bg-[#2B3138]
+                 p-4 rounded-lg block transition shadow-sm">
+          <p class="font-semibold">Update</p>
+        </a>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+  function filterMenu() {
+    const q = document.getElementById("menuSearch").value.toLowerCase();
+    document.querySelectorAll(".menu-item").forEach(item => {
+      item.style.display = item.textContent.toLowerCase().includes(q) ? "block" : "none";
+    });
+  }
+
+  // URL PARAMS
+  const params = new URLSearchParams(window.location.search);
+  const group = params.get("group");
+  const load = params.get("load");
+  const broker = params.get("broker");
+
+  // Show group name on panel
+  if(group) {
+    document.getElementById("groupName").textContent = "Group: " + group;
+  }
+
+  // UPDATE link with query forwarding
+  let updateURL = "update.html";
+
+  const q = [];
+  if(group) q.push("group=" + encodeURIComponent(group));
+  if(load) q.push("load=" + encodeURIComponent(load));
+  if(broker) q.push("broker=" + encodeURIComponent(broker));
+
+  if(q.length > 0) updateURL += "?" + q.join("&");
+
+  document.getElementById("updateLink").href = updateURL;
+
+</script>
+
+</body>
+</html>
