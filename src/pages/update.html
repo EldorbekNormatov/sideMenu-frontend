@@ -53,9 +53,11 @@
         <button onclick="showForm('shipperPickup')"
           class="btn bg-green-600 hover:bg-green-700">Shipper Pick-up</button>
         <button onclick="showForm('receiverDelivery')"
-          class="btn bg-purple-600 hover:bg-purple-700">Receiver Delivery</button>
+          class="btn bg-purple-600 hover:bg-purple-700">Receiver
+          Delivery</button>
         <button onclick="showForm('receiverFullPod')"
-          class="btn bg-yellow-500 hover:bg-yellow-400 text-black">POD Full Delivery</button>
+          class="btn bg-yellow-500 hover:bg-yellow-400 text-black">POD Full
+          Delivery</button>
       </div>
 
       <script>
@@ -84,8 +86,10 @@
         <h2 class="title text-xl font-bold mb-3">Load Report</h2>
 
         <div class="bg-[#1F242D] p-3 rounded-lg border border-gray-700 mb-3">
-          <p class="font-semibold text-blue-400">Broker: <span id="autoBroker"></span></p>
-          <p class="font-semibold text-blue-400">ID#: <span id="autoBrokerId"></span></p>
+          <p class="font-semibold text-blue-400">Broker: <span
+              id="autoBroker"></span></p>
+          <p class="font-semibold text-blue-400">ID#: <span
+              id="autoBrokerId"></span></p>
         </div>
 
         <label class="label">EMPTY TRAILER #</label>
@@ -94,7 +98,8 @@
         <hr class="divider">
 
         <label class="label">♻️ SHIPPER PICK-UP Location</label>
-        <textarea id="puLocation" class="textarea" placeholder="Palmetto, GA 30268"></textarea>
+        <textarea id="puLocation" class="textarea"
+          placeholder="Palmetto, GA 30268"></textarea>
 
         <div class="flex gap-4">
           <div class="w-1/2">
@@ -113,14 +118,19 @@
         <hr class="divider">
 
         <h3 class="font-bold text-lg">📄 BOL</h3>
-        <label class="check"><input id="bolMatch" type="checkbox"> Shipper & Receiver Matches</label>
-        <label class="check"><input id="bolSeal" type="checkbox"> Seal intact & matches</label>
-        <label class="check"><input id="bolPages" type="checkbox"> With all pages & clear</label>
+        <label class="check"><input id="bolMatch" type="checkbox"> Shipper &
+          Receiver Matches</label>
+        <label class="check"><input id="bolSeal" type="checkbox"> Seal intact &
+          matches</label>
+        <label class="check"><input id="bolPages" type="checkbox"> With all
+          pages & clear</label>
 
         <hr class="divider">
 
-        <label class="check"><input id="trailerImages" type="checkbox"> Trailer & Seal Images</label>
-        <label class="check"><input id="tracking" type="checkbox"> 📲📍 App & Tracking</label>
+        <label class="check"><input id="trailerImages" type="checkbox"> Trailer
+          & Seal Images</label>
+        <label class="check"><input id="tracking" type="checkbox"> 📲📍 App &
+          Tracking</label>
 
         <button
           class="submit-btn bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg mt-4"
@@ -142,7 +152,8 @@
         <h3 class="font-bold text-lg">♻️ SHIPPER PICK-UP</h3>
 
         <label class="label">Location</label>
-        <textarea id="sp_location" class="textarea" placeholder="Gooding, ID 83330"></textarea>
+        <textarea id="sp_location" class="textarea"
+          placeholder="Gooding, ID 83330"></textarea>
 
         <div class="flex gap-4">
           <div class="w-1/2">
@@ -161,9 +172,12 @@
         <hr class="divider">
 
         <h3 class="font-bold text-lg">📄 BOL</h3>
-        <label class="check"><input id="sp_match" type="checkbox"> Shipper & Receiver Matches</label>
-        <label class="check"><input id="sp_pages" type="checkbox"> With all pages & Clear</label>
-        <label class="check"><input id="sp_seal" type="checkbox"> Seal intact & matches</label>
+        <label class="check"><input id="sp_match" type="checkbox"> Shipper &
+          Receiver Matches</label>
+        <label class="check"><input id="sp_pages" type="checkbox"> With all
+          pages & Clear</label>
+        <label class="check"><input id="sp_seal" type="checkbox"> Seal intact &
+          matches</label>
 
         <label class="label mt-4">Status Updated</label>
         <input id="sp_statusUpdated" class="input">
@@ -181,7 +195,8 @@
         <h2 class="title">Receiver Delivery</h2>
 
         <label class="label">Receiver Location</label>
-        <input id="rd_location" class="input" placeholder="Fort Pierce, FL 34981">
+        <input id="rd_location" class="input"
+          placeholder="Fort Pierce, FL 34981">
 
         <div class="flex gap-4">
           <div class="w-1/2">
@@ -200,15 +215,21 @@
         <hr class="divider">
 
         <h3 class="font-bold text-lg">📝 PROOF OF DELIVERY (POD)</h3>
-        <label class="check"><input id="rd_seal" type="checkbox"> Seal intact</label>
-        <label class="check"><input id="rd_osd" type="checkbox"> OS&D (Over/Short/Damage)</label>
-        <label class="check"><input id="rd_signature" type="checkbox"> Signature or Stamp</label>
-        <label class="check"><input id="rd_clear" type="checkbox"> With all pages & Clear</label>
+        <label class="check"><input id="rd_seal" type="checkbox"> Seal
+          intact</label>
+        <label class="check"><input id="rd_osd" type="checkbox"> OS&D
+          (Over/Short/Damage)</label>
+        <label class="check"><input id="rd_signature" type="checkbox"> Signature
+          or Stamp</label>
+        <label class="check"><input id="rd_clear" type="checkbox"> With all
+          pages & Clear</label>
 
         <hr class="divider">
 
-        <label class="check"><input id="rd_images" type="checkbox"> Trailer&Seal Images</label>
-        <label class="check"><input id="rd_tracking" type="checkbox"> 📲📍App & Tracking</label>
+        <label class="check"><input id="rd_images" type="checkbox"> Trailer&Seal
+          Images</label>
+        <label class="check"><input id="rd_tracking" type="checkbox"> 📲📍App &
+          Tracking</label>
 
         <hr class="divider">
 
@@ -216,7 +237,7 @@
         <input id="rd_emptyTrailer" class="input" placeholder="TA159020">
 
         <label class="label">Drop-off location for empty trailer</label>
-        <input id="rd_dropoffLocation" class="input" placeholder="">
+        <input id="rd_dropoffLocation" class="input" placeholder>
 
         <button
           class="submit-btn bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg mt-4"
@@ -244,11 +265,16 @@
         <hr class="divider">
 
         <h3 class="font-bold text-lg">📝 PROOF OF DELIVERY (POD)</h3>
-        <label class="check"><input id="pod_seal" type="checkbox"> Seal intact</label>
-        <label class="check"><input id="pod_osd" type="checkbox"> OS&D (Over/Short/Damage)</label>
-        <label class="check"><input id="pod_signature" type="checkbox"> Signature or Stamp</label>
-        <label class="check"><input id="pod_date" type="checkbox"> Date On POD</label>
-        <label class="check"><input id="pod_clear" type="checkbox"> With all pages & Clear</label>
+        <label class="check"><input id="pod_seal" type="checkbox"> Seal
+          intact</label>
+        <label class="check"><input id="pod_osd" type="checkbox"> OS&D
+          (Over/Short/Damage)</label>
+        <label class="check"><input id="pod_signature" type="checkbox">
+          Signature or Stamp</label>
+        <label class="check"><input id="pod_date" type="checkbox"> Date On
+          POD</label>
+        <label class="check"><input id="pod_clear" type="checkbox"> With all
+          pages & Clear</label>
 
         <label class="label mt-4">Status Updated</label>
         <input id="pod_statusUpdated" class="input">
@@ -263,10 +289,15 @@
 
       <!-- ========================= WEBSOCKET + LOGIC ========================= -->
       <script>
-const userId = (new URLSearchParams(window.location.search).get("user")) ?? 1912055376; // may be null
+let userId = new URLSearchParams(window.location.search).get("user"); // may be null
 //Asror
 
-if (!userId) userId = "1912055376";
+if (!userId || userId === "null" || userId === "undefined") {
+  userId = "1912055376";
+}
+
+console.log("🟦 USER ID =", userId);
+
 // GLOBAL session saved to localStorage so refresh won't lose current pickup
 let GLOBAL = JSON.parse(localStorage.getItem("pickupSession")) || {
   broker: "",
@@ -288,29 +319,56 @@ if (GLOBAL.broker) {
 const ws = new WebSocket("wss://websocket.nvmailer.uz/?user=" + (userId ?? "1912055376"));
 
 
-// register as front when connected
+// REGISTER FRONTEND CLIENT
 ws.onopen = () => {
+  console.log("🟩 WS CONNECTED TO SERVER");
+
   ws.send(JSON.stringify({
     type: "register",
     clientId: "front"
   }));
+
+  console.log("🟦 Sent register packet");
 };
 
-// incoming from bot (via WS bridge server)
-ws.onmessage = (event) => {
-  let data;
-  try { data = JSON.parse(event.data); } catch (e) { console.log("WS parse error", e); return; }
+// WS ERROR
+ws.onerror = (err) => {
+  console.log("🟥 WS ERROR:", err);
+};
 
-  // if targetUserId present and doesn't match current user, ignore (supports multiple front clients)
-  if (data.targetUserId && String(data.targetUserId) !== String(userId)) {
-    console.log("WS message received:", data);
+// WS CLOSED
+ws.onclose = () => {
+  console.log("🟧 WS CLOSED");
+};
+
+// HANDLE INCOMING MESSAGES
+ws.onmessage = (event) => {
+  console.log("⬇️ RAW WS MESSAGE:", event.data);
+
+  let data;
+  try {
+    data = JSON.parse(event.data);
+  } catch (e) {
+    console.log("🟥 WS JSON parse error:", e);
     return;
   }
 
-  // PICKUP_DATA: auto-fill load info and show loadReport
-  if (data.type === "PICKUP_DATA" || data.type === "pickup" || data.type === undefined && data.broker) {
-     console.log("WS message received:", data);
-    // clear UI forms first
+  console.log("🟦 Parsed WS Message:", data);
+
+  // Ignore if message is for another user
+  if (data.targetUserId && String(data.targetUserId) !== String(userId)) {
+    console.log("↩️ WS Message ignored (not matching user)");
+    return;
+  }
+
+  // HANDLE PICKUP DATA
+  if (
+    data.type === "PICKUP_DATA" ||
+    data.type === "pickup" ||
+    (data.type === undefined && data.broker)
+  ) {
+    console.log("🟩 PICKUP DATA RECEIVED:", data);
+
     clearAllForms();
 
     GLOBAL = {
@@ -321,10 +379,11 @@ ws.onmessage = (event) => {
       replyMessageId: data.replyMessageId || ""
     };
 
+    // Save to localStorage
     localStorage.setItem("pickupSession", JSON.stringify(GLOBAL));
-    console.log("Saved to LS:", localStorage.getItem("pickupSession"));
+    console.log("💾 Session Saved:", GLOBAL);
 
-
+    // Update UI
     document.getElementById("autoBroker").innerText = GLOBAL.broker;
     document.getElementById("autoBrokerId").innerText = GLOBAL.brokerId;
     document.getElementById("brokerNameDisplay").innerText = GLOBAL.broker;
@@ -332,8 +391,6 @@ ws.onmessage = (event) => {
 
     showForm("loadReport");
   }
-
-  // you can add more handlers for other incoming ws messages if needed
 };
 
 // === FORM SUBMIT ===
