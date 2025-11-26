@@ -266,6 +266,7 @@
 const userId = (new URLSearchParams(window.location.search).get("user")) ?? 1912055376; // may be null
 //Asror
 
+if (!userId) userId = "1912055376";
 // GLOBAL session saved to localStorage so refresh won't lose current pickup
 let GLOBAL = JSON.parse(localStorage.getItem("pickupSession")) || {
   broker: "",
@@ -284,7 +285,7 @@ if (GLOBAL.broker) {
   showForm("loadReport");
 }
 
-const ws = new WebSocket("wss://websocket.nvmailer.uz/?user=" + (userId ?? ""));
+const ws = new WebSocket("wss://websocket.nvmailer.uz/?user=" + (userId ?? "1912055376"));
 
 
 // register as front when connected
