@@ -84,6 +84,7 @@
   const group = params.get("group");
   const load = params.get("load");
   const broker = params.get("broker");
+  const user = params.get("user");   // 🟢 YANGI QO‘SHILDI
 
   // Show group name on panel
   if(group) {
@@ -97,6 +98,7 @@
   if(group) q.push("group=" + encodeURIComponent(group));
   if(load) q.push("load=" + encodeURIComponent(load));
   if(broker) q.push("broker=" + encodeURIComponent(broker));
+  if(user) q.push("user=" + encodeURIComponent(user));  // 🟢 YANGI QO‘SHILDI
 
   if(q.length > 0) updateURL += "?" + q.join("&");
 
