@@ -306,13 +306,29 @@
         <!-- ========================= WEBSOCKET + LOGIC ========================= -->
         <script>
             // ======================== USER ID FROM TELEGRAM WEBAPP ========================
-            const tg = window.Telegram ?.WebApp;
-            tg ?.expand(); // fullscreen qilish
-            tg ?.ready();
+           // ======================== USER ID FIX (URL + LOCALSTORAGE + TELEGRAM) ========================
 
-            // 1) Asosiy manba: Telegram user ID
-            let userId = tg?.initDataUnsafe?.user?.id;
-            alert("🔵 TELEGRAM USER ID Web appni o'zidan oqib olindi =", userId);
+// 1) URL orqali kelgan uid
+const uidFromUrl = new URLSearchParams(window.location.search).get("uid");
+if (uidFromUrl) {
+    localStorage.setItem("tg_user_id", uidFromUrl);
+}
+
+// 2) localStorage dagi ID
+let savedId = localStorage.getItem("tg_user_id");
+
+// 3) Telegram WebApp orqali ID
+let tgId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+
+// 4) userId final birlashtirish
+let userId = tgId || uidFromUrl || savedId;
+
+// 5) Agar baribir bo‘lmasa xabar chiqsin
+if (!userId) {
+    alert("❗ User ID topilmadi. Iltimos, Telegram botdan oching.");
+} else {
+    localStorage.setItem("tg_user_id", userId);
+}
 
             // 2) WebApp bo‘lmasa test payti URL fallback
             // if (!userId) {
@@ -321,9 +337,9 @@
             // }
 
             // 3) Agar baribir bo‘lmasa (old test defaulti)
-            if (!userId || userId === "null" || userId === "undefined") {
-                userId = "1912055376";
-            }
+            // if (!userId || userId === "null" || userId === "undefined") {
+            //     userId = "1912055376";
+            // }
             // console.log("🟩 FINAL USER ID =", userId);
 
 

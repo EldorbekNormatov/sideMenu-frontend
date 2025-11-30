@@ -72,6 +72,7 @@
   </div>
 
 <script>
+  /* ========================= SEARCH ========================== */
   function filterMenu() {
     const q = document.getElementById("menuSearch").value.toLowerCase();
     document.querySelectorAll(".menu-item").forEach(item => {
@@ -79,26 +80,40 @@
     });
   }
 
+  /* ========================= USER ID MANAGEMENT ========================== */
+
   // URL PARAMS
   const params = new URLSearchParams(window.location.search);
+  const uidFromUrl = params.get("uid");
+
+  // 1) Agar URL’da user ID bo‘lsa — uni saqlaymiz
+  if (uidFromUrl) {
+    localStorage.setItem("tg_user_id", uidFromUrl);
+  }
+
+  // 2) Hamma sahifa uchun umumiy ID
+  const userId = localStorage.getItem("tg_user_id");
+
+  /* ========================= OTHER PARAMS ========================== */
   const group = params.get("group");
   const load = params.get("load");
   const broker = params.get("broker");
-  const user = params.get("user");   // 🟢 YANGI QO‘SHILDI
 
-  // Show group name on panel
+  // Show group on UI
   if(group) {
     document.getElementById("groupName").textContent = "Group: " + group;
   }
 
-  // UPDATE link with query forwarding
+  /* ========================= UPDATE LINK BUILDER ========================== */
   let updateURL = "update.html";
 
   const q = [];
   if(group) q.push("group=" + encodeURIComponent(group));
   if(load) q.push("load=" + encodeURIComponent(load));
   if(broker) q.push("broker=" + encodeURIComponent(broker));
-  if(user) q.push("user=" + encodeURIComponent(user));  // 🟢 YANGI QO‘SHILDI
+
+  // 🟢 User ID ni ham har doim qo‘shamiz
+  if(userId) q.push("uid=" + encodeURIComponent(userId));
 
   if(q.length > 0) updateURL += "?" + q.join("&");
 
