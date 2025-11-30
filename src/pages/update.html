@@ -289,16 +289,28 @@
 
       <!-- ========================= WEBSOCKET + LOGIC ========================= -->
       <script>
-let userId = new URLSearchParams(window.location.search).get("user"); // may be null
-//Asror
+// ======================== USER ID FROM TELEGRAM WEBAPP ========================
+const tg = window.Telegram.WebApp;
+tg.expand(); // fullscreen qilish
 
+// 1) Asosiy manba: Telegram user ID
+let userId = tg.initDataUnsafe?.user?.id;
+console.log("🔵 TELEGRAM USER ID Web appni o'zidan oqib olindi =", userId);
+
+// 2) WebApp bo‘lmasa test payti URL fallback
+if (!userId) {
+  userId = new URLSearchParams(window.location.search).get("user");
+  console.log("🟠 URL USER =", userId);
+}
+
+// 3) Agar baribir bo‘lmasa (old test defaulti)
 if (!userId || userId === "null" || userId === "undefined") {
   userId = "1912055376";
 }
+console.log("🟩 FINAL USER ID =", userId);
 
-console.log("🟦 USER ID =", userId);
 
-// GLOBAL session saved to localStorage so refresh won't lose current pickup
+// ======================== GLOBAL SESSION ========================
 let GLOBAL = JSON.parse(localStorage.getItem("pickupSession")) || {
   broker: "",
   brokerId: "",
@@ -316,58 +328,51 @@ if (GLOBAL.broker) {
   showForm("loadReport");
 }
 
-const ws = new WebSocket("wss://websocket.nvmailer.uz/?user=" + (userId ?? "1912055376"));
 
+// ======================== WEBSOCKET CONNECT ========================
+const ws = new WebSocket("wss://websocket.nvmailer.uz/?user=" + userId);
 
-// REGISTER FRONTEND CLIENT
 ws.onopen = () => {
-  console.log("🟩 WS CONNECTED TO SERVER");
+  console.log("🟢 WS CONNECTED");
 
   ws.send(JSON.stringify({
     type: "register",
     clientId: "front"
   }));
-
-  console.log("🟦 Sent register packet");
+  console.log("🟦 REGISTER SENT");
 };
 
-// WS ERROR
-ws.onerror = (err) => {
-  console.log("🟥 WS ERROR:", err);
-};
+ws.onerror = (err) => console.log("🔴 WS ERROR:", err);
+ws.onclose = () => console.log("🟠 WS CLOSED");
 
-// WS CLOSED
-ws.onclose = () => {
-  console.log("🟧 WS CLOSED");
-};
 
-// HANDLE INCOMING MESSAGES
+// ======================== HANDLE INCOMING WS MSG ========================
 ws.onmessage = (event) => {
-  console.log("⬇️ RAW WS MESSAGE:", event.data);
+  console.log("⬇️ RAW WS:", event.data);
 
   let data;
   try {
     data = JSON.parse(event.data);
-  } catch (e) {
-    console.log("🟥 WS JSON parse error:", e);
+  } catch {
+    console.log("JSON ERROR");
     return;
   }
 
-  console.log("🟦 Parsed WS Message:", data);
+  console.log("🟦 PARSED:", data);
 
-  // Ignore if message is for another user
+  // Wrong user
   if (data.targetUserId && String(data.targetUserId) !== String(userId)) {
-    console.log("↩️ WS Message ignored (not matching user)");
+    console.log("↩️ NOT THIS USER");
     return;
   }
 
-  // HANDLE PICKUP DATA
+  // PICKUP DATA
   if (
     data.type === "PICKUP_DATA" ||
     data.type === "pickup" ||
-    (data.type === undefined && data.broker)
+    (!data.type && data.broker)
   ) {
-    console.log("🟩 PICKUP DATA RECEIVED:", data);
+    console.log("🟢 PICKUP RECEIVED");
 
     clearAllForms();
 
@@ -379,11 +384,9 @@ ws.onmessage = (event) => {
       replyMessageId: data.replyMessageId || ""
     };
 
-    // Save to localStorage
     localStorage.setItem("pickupSession", JSON.stringify(GLOBAL));
-    console.log("💾 Session Saved:", GLOBAL);
+    console.log("💾 SAVED", GLOBAL);
 
-    // Update UI
     document.getElementById("autoBroker").innerText = GLOBAL.broker;
     document.getElementById("autoBrokerId").innerText = GLOBAL.brokerId;
     document.getElementById("brokerNameDisplay").innerText = GLOBAL.broker;
@@ -393,7 +396,8 @@ ws.onmessage = (event) => {
   }
 };
 
-// === FORM SUBMIT ===
+
+// ======================== FORM SUBMISSION ========================
 document.querySelectorAll(".submit-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     const formType = btn.dataset.form;
@@ -412,16 +416,16 @@ document.querySelectorAll(".submit-btn").forEach(btn => {
     if (formType === "loadReport") {
       payload = {
         ...payload,
-        emptyTrailer: document.getElementById("emptyTrailer")?.value || "",
-        puLocation: document.getElementById("puLocation")?.value || "",
-        puCheckIn: document.getElementById("puCheckIn")?.value || "",
-        puCheckOut: document.getElementById("puCheckOut")?.value || "",
-        preloadedTrailer: document.getElementById("preloadedTrailer")?.value || "",
-        bolMatch: !!document.getElementById("bolMatch")?.checked,
-        bolSeal: !!document.getElementById("bolSeal")?.checked,
-        bolPages: !!document.getElementById("bolPages")?.checked,
-        trailerImages: !!document.getElementById("trailerImages")?.checked,
-        tracking: !!document.getElementById("tracking")?.checked,
+        emptyTrailer: emptyTrailer.value,
+        puLocation: puLocation.value,
+        puCheckIn: puCheckIn.value,
+        puCheckOut: puCheckOut.value,
+        preloadedTrailer: preloadedTrailer.value,
+        bolMatch: bolMatch.checked,
+        bolSeal: bolSeal.checked,
+        bolPages: bolPages.checked,
+        trailerImages: trailerImages.checked,
+        tracking: tracking.checked,
       };
     }
 
@@ -429,15 +433,15 @@ document.querySelectorAll(".submit-btn").forEach(btn => {
     if (formType === "shipperPickup") {
       payload = {
         ...payload,
-        sp_location: document.getElementById("sp_location")?.value || "",
-        sp_checkin: document.getElementById("sp_checkin")?.value || "",
-        sp_checkout: document.getElementById("sp_checkout")?.value || "",
-        sp_trailer: document.getElementById("sp_trailer")?.value || "",
-        sp_match: !!document.getElementById("sp_match")?.checked,
-        sp_pages: !!document.getElementById("sp_pages")?.checked,
-        sp_seal: !!document.getElementById("sp_seal")?.checked,
-        sp_statusUpdated: document.getElementById("sp_statusUpdated")?.value || "",
-        sp_gtg: document.getElementById("sp_gtg")?.value || "",
+        sp_location: sp_location.value,
+        sp_checkin: sp_checkin.value,
+        sp_checkout: sp_checkout.value,
+        sp_trailer: sp_trailer.value,
+        sp_match: sp_match.checked,
+        sp_pages: sp_pages.checked,
+        sp_seal: sp_seal.checked,
+        sp_statusUpdated: sp_statusUpdated.value,
+        sp_gtg: sp_gtg.value,
       };
     }
 
@@ -445,46 +449,46 @@ document.querySelectorAll(".submit-btn").forEach(btn => {
     if (formType === "receiverDelivery") {
       payload = {
         ...payload,
-        rd_location: document.getElementById("rd_location")?.value || "",
-        rd_checkin: document.getElementById("rd_checkin")?.value || "",
-        rd_checkout: document.getElementById("rd_checkout")?.value || "",
-        rd_droppedTrailer: document.getElementById("rd_droppedTrailer")?.value || "",
-        rd_seal: !!document.getElementById("rd_seal")?.checked,
-        rd_osd: !!document.getElementById("rd_osd")?.checked,
-        rd_signature: !!document.getElementById("rd_signature")?.checked,
-        rd_clear: !!document.getElementById("rd_clear")?.checked,
-        rd_images: !!document.getElementById("rd_images")?.checked,
-        rd_tracking: !!document.getElementById("rd_tracking")?.checked,
-        rd_emptyTrailer: document.getElementById("rd_emptyTrailer")?.value || "",
-        rd_dropoffLocation: document.getElementById("rd_dropoffLocation")?.value || ""
+        rd_location: rd_location.value,
+        rd_checkin: rd_checkin.value,
+        rd_checkout: rd_checkout.value,
+        rd_droppedTrailer: rd_droppedTrailer.value,
+        rd_seal: rd_seal.checked,
+        rd_osd: rd_osd.checked,
+        rd_signature: rd_signature.checked,
+        rd_clear: rd_clear.checked,
+        rd_images: rd_images.checked,
+        rd_tracking: rd_tracking.checked,
+        rd_emptyTrailer: rd_emptyTrailer.value,
+        rd_dropoffLocation: rd_dropoffLocation.value
       };
     }
 
-    // POD FULL DELIVERY
+    // POD FULL
     if (formType === "receiverFullPod") {
       payload = {
         ...payload,
-        pod_location: document.getElementById("pod_location")?.value || "",
-        pod_checkin: document.getElementById("pod_checkin")?.value || "",
-        pod_checkout: document.getElementById("pod_checkout")?.value || "",
-        pod_seal: !!document.getElementById("pod_seal")?.checked,
-        pod_osd: !!document.getElementById("pod_osd")?.checked,
-        pod_signature: !!document.getElementById("pod_signature")?.checked,
-        pod_date: !!document.getElementById("pod_date")?.checked,
-        pod_clear: !!document.getElementById("pod_clear")?.checked,
-        pod_statusUpdated: document.getElementById("pod_statusUpdated")?.value || "",
-        pod_gtg: document.getElementById("pod_gtg")?.value || ""
+        pod_location: pod_location.value,
+        pod_checkin: pod_checkin.value,
+        pod_checkout: pod_checkout.value,
+        pod_seal: pod_seal.checked,
+        pod_osd: pod_osd.checked,
+        pod_signature: pod_signature.checked,
+        pod_date: pod_date.checked,
+        pod_clear: pod_clear.checked,
+        pod_statusUpdated: pod_statusUpdated.value,
+        pod_gtg: pod_gtg.value
       };
     }
 
-    // send to bot via WS bridge (bridge will forward to bot)
     ws.send(JSON.stringify({
       type: "send_to_bot",
       payload
     }));
   });
 });
-      </script>
+</script>
+
     </div>
   </body>
 </html>
