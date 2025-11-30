@@ -485,7 +485,9 @@ document.querySelectorAll(".submit-btn").forEach(btn => {
       type: "send_to_bot",
       payload
     }));
-    clearAllForms();
+    setTimeout(() => {
+  clearAllForms();
+}, 50);
   });
 });
 </script>
