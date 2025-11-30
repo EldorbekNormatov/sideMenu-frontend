@@ -307,10 +307,9 @@
         <!-- ========================= WEBSOCKET + LOGIC ========================= -->
         <script>
             // ======================== USER ID FROM TELEGRAM WEBAPP ========================
-            const tg = window.Telegram.WebApp;
-            tg.expand(); // fullscreen qilish
+            const tg = window.Telegram?.WebApp;
+            tg?.expand(); // fullscreen qilish
 
-            console.alert("🔵 TELEGRAM WEBAPP INIT DATA:\n" + JSON.stringify(tg.initDataUnsafe, null, 2));
             // 1) Asosiy manba: Telegram user ID
             let userId = tg?.initDataUnsafe?.user?.id;
             console.log("🔵 TELEGRAM USER ID Web appni o'zidan oqib olindi =", userId);
