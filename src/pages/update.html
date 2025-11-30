@@ -310,7 +310,7 @@
             tg.expand(); // fullscreen qilish
 
             // 1) Asosiy manba: Telegram user ID
-            let userId = tg.initDataUnsafe ? .user ? .id;
+            let userId = tg.initDataUnsafe.user.id;
             console.log("🔵 TELEGRAM USER ID Web appni o'zidan oqib olindi =", userId);
 
             // 2) WebApp bo‘lmasa test payti URL fallback
