@@ -1,497 +1,517 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://cdn.tailwindcss.com"></script>
     <title>NAVGINX — Load Forms</title>
 
     <style>
-      .hidden-form { display: none; }
-      .fade { animation: fadeIn 0.35s ease-in-out; }
-      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px);} to {opacity: 1; transform: translateY(0);} }
-      .readonly-box {
-        background-color: #1F242D;
-        border: 1px solid #333;
-        padding: 10px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        color: #7dd3fc;
-      }
-      .label { display: block; margin-top: 12px; font-weight: 600; }
-      .input, .textarea {
-        width: 100%;
-        padding: 10px;
-        background: #1F242D;
-        border: 1px solid #333;
-        border-radius: 8px;
-        margin-top: 5px;
-      }
-      .divider { margin: 15px 0; border-color: #333; }
-      .check { margin: 10px 0; display: flex; align-items: center; gap: 10px; }
+        .hidden-form {
+            display: none;
+        }
+        
+        .fade {
+            animation: fadeIn 0.35s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .readonly-box {
+            background-color: #1F242D;
+            border: 1px solid #333;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            color: #7dd3fc;
+        }
+        
+        .label {
+            display: block;
+            margin-top: 12px;
+            font-weight: 600;
+        }
+        
+        .input,
+        .textarea {
+            width: 100%;
+            padding: 10px;
+            background: #1F242D;
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin-top: 5px;
+        }
+        
+        .divider {
+            margin: 15px 0;
+            border-color: #333;
+        }
+        
+        .check {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
     </style>
-  </head>
+</head>
 
-  <body class="bg-[#0D1117] text-white min-h-screen p-4">
+<body class="bg-[#0D1117] text-white min-h-screen p-4">
     <div class="max-w-xl mx-auto">
 
-      <div class="mb-4">
-        <a href="index.html"
-          class="inline-block bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg shadow-md transition">
+        <div class="mb-4">
+            <a href="index.html" class="inline-block bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg shadow-md transition">
           ⬅️ Home
         </a>
-      </div>
-
-      <h1 class="text-3xl font-bold text-center mb-6 tracking-wide">
-        🚚 Load Forms Center
-      </h1>
-
-      <!-- BUTTONS -->
-      <div class="grid grid-cols-2 gap-4 mb-8">
-        <button onclick="showForm('loadReport')"
-          class="btn bg-blue-600 hover:bg-blue-700">Load Report</button>
-        <button onclick="showForm('shipperPickup')"
-          class="btn bg-green-600 hover:bg-green-700">Shipper Pick-up</button>
-        <button onclick="showForm('receiverDelivery')"
-          class="btn bg-purple-600 hover:bg-purple-700">Receiver
-          Delivery</button>
-        <button onclick="showForm('receiverFullPod')"
-          class="btn bg-yellow-500 hover:bg-yellow-400 text-black">POD Full
-          Delivery</button>
-      </div>
-
-      <script>
-        document.querySelectorAll(".btn").forEach(btn => {
-          btn.classList.add("py-3","rounded-xl","font-semibold","shadow-md","hover:shadow-xl","transition-all");
-        });
-
-        function showForm(id) {
-          document.querySelectorAll(".form-box").forEach(f => f.style.display = "none");
-          const el = document.getElementById(id);
-          if (el) el.style.display = "block";
-        }
-
-        // 🔥 barcha formalarni tozalovchi funksiya
-        function clearAllForms() {
-          document.querySelectorAll("input").forEach(i => {
-            if (i.type === "checkbox") i.checked = false;
-            else i.value = "";
-          });
-          document.querySelectorAll("textarea").forEach(t => t.value = "");
-        }
-      </script>
-
-      <!-- ====================== LOAD REPORT FORM ====================== -->
-      <div id="loadReport" class="hidden-form fade form-box">
-        <h2 class="title text-xl font-bold mb-3">Load Report</h2>
-
-        <div class="bg-[#1F242D] p-3 rounded-lg border border-gray-700 mb-3">
-          <p class="font-semibold text-blue-400">Broker: <span
-              id="autoBroker"></span></p>
-          <p class="font-semibold text-blue-400">ID#: <span
-              id="autoBrokerId"></span></p>
         </div>
 
-        <label class="label">EMPTY TRAILER #</label>
-        <input id="emptyTrailer" class="input" placeholder="bobtail in">
+        <h1 class="text-3xl font-bold text-center mb-6 tracking-wide">
+            🚚 Load Forms Center
+        </h1>
 
-        <hr class="divider">
-
-        <label class="label">♻️ SHIPPER PICK-UP Location</label>
-        <textarea id="puLocation" class="textarea"
-          placeholder="Palmetto, GA 30268"></textarea>
-
-        <div class="flex gap-4">
-          <div class="w-1/2">
-            <label class="label">Check-in</label>
-            <input id="puCheckIn" type="time" class="input">
-          </div>
-          <div class="w-1/2">
-            <label class="label">Check-out</label>
-            <input id="puCheckOut" type="time" class="input">
-          </div>
+        <!-- BUTTONS -->
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <button onclick="showForm('loadReport')" class="btn bg-blue-600 hover:bg-blue-700">Load Report</button>
+            <button onclick="showForm('shipperPickup')" class="btn bg-green-600 hover:bg-green-700">Shipper Pick-up</button>
+            <button onclick="showForm('receiverDelivery')" class="btn bg-purple-600 hover:bg-purple-700">Receiver
+          Delivery</button>
+            <button onclick="showForm('receiverFullPod')" class="btn bg-yellow-500 hover:bg-yellow-400 text-black">POD Full
+          Delivery</button>
         </div>
 
-        <label class="label">Preloaded Trailer #</label>
-        <input id="preloadedTrailer" class="input" placeholder="TA156396">
+        <script>
+            document.querySelectorAll(".btn").forEach(btn => {
+                btn.classList.add("py-3", "rounded-xl", "font-semibold", "shadow-md", "hover:shadow-xl", "transition-all");
+            });
 
-        <hr class="divider">
+            function showForm(id) {
+                document.querySelectorAll(".form-box").forEach(f => f.style.display = "none");
+                const el = document.getElementById(id);
+                if (el) el.style.display = "block";
+            }
 
-        <h3 class="font-bold text-lg">📄 BOL</h3>
-        <label class="check"><input id="bolMatch" type="checkbox"> Shipper &
+            // 🔥 barcha formalarni tozalovchi funksiya
+            function clearAllForms() {
+                document.querySelectorAll("input").forEach(i => {
+                    if (i.type === "checkbox") i.checked = false;
+                    else i.value = "";
+                });
+                document.querySelectorAll("textarea").forEach(t => t.value = "");
+            }
+        </script>
+
+        <!-- ====================== LOAD REPORT FORM ====================== -->
+        <div id="loadReport" class="hidden-form fade form-box">
+            <h2 class="title text-xl font-bold mb-3">Load Report</h2>
+
+            <div class="bg-[#1F242D] p-3 rounded-lg border border-gray-700 mb-3">
+                <p class="font-semibold text-blue-400">Broker: <span id="autoBroker"></span></p>
+                <p class="font-semibold text-blue-400">ID#: <span id="autoBrokerId"></span></p>
+            </div>
+
+            <label class="label">EMPTY TRAILER #</label>
+            <input id="emptyTrailer" class="input" placeholder="bobtail in">
+
+            <hr class="divider">
+
+            <label class="label">♻️ SHIPPER PICK-UP Location</label>
+            <textarea id="puLocation" class="textarea" placeholder="Palmetto, GA 30268"></textarea>
+
+            <div class="flex gap-4">
+                <div class="w-1/2">
+                    <label class="label">Check-in</label>
+                    <input id="puCheckIn" type="time" class="input">
+                </div>
+                <div class="w-1/2">
+                    <label class="label">Check-out</label>
+                    <input id="puCheckOut" type="time" class="input">
+                </div>
+            </div>
+
+            <label class="label">Preloaded Trailer #</label>
+            <input id="preloadedTrailer" class="input" placeholder="TA156396">
+
+            <hr class="divider">
+
+            <h3 class="font-bold text-lg">📄 BOL</h3>
+            <label class="check"><input id="bolMatch" type="checkbox"> Shipper &
           Receiver Matches</label>
-        <label class="check"><input id="bolSeal" type="checkbox"> Seal intact &
+            <label class="check"><input id="bolSeal" type="checkbox"> Seal intact &
           matches</label>
-        <label class="check"><input id="bolPages" type="checkbox"> With all
+            <label class="check"><input id="bolPages" type="checkbox"> With all
           pages & clear</label>
 
-        <hr class="divider">
+            <hr class="divider">
 
-        <label class="check"><input id="trailerImages" type="checkbox"> Trailer
+            <label class="check"><input id="trailerImages" type="checkbox"> Trailer
           & Seal Images</label>
-        <label class="check"><input id="tracking" type="checkbox"> 📲📍 App &
+            <label class="check"><input id="tracking" type="checkbox"> 📲📍 App &
           Tracking</label>
 
-        <button
-          class="submit-btn bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg mt-4"
-          data-form="loadReport">Submit</button>
-      </div>
-
-      <!-- ====================== SHIPPER PICKUP FORM ====================== -->
-      <div id="shipperPickup" class="hidden-form fade form-box">
-        <h2 class="title">Shipper Pick-up</h2>
-
-        <label class="label">Broker</label>
-        <div id="brokerNameDisplay" class="readonly-box"></div>
-
-        <label class="label">ID#</label>
-        <div id="brokerIdDisplay" class="readonly-box"></div>
-
-        <hr class="divider">
-
-        <h3 class="font-bold text-lg">♻️ SHIPPER PICK-UP</h3>
-
-        <label class="label">Location</label>
-        <textarea id="sp_location" class="textarea"
-          placeholder="Gooding, ID 83330"></textarea>
-
-        <div class="flex gap-4">
-          <div class="w-1/2">
-            <label class="label">Check-in</label>
-            <input id="sp_checkin" type="time" class="input">
-          </div>
-          <div class="w-1/2">
-            <label class="label">Check-out</label>
-            <input id="sp_checkout" type="time" class="input">
-          </div>
+            <button class="submit-btn bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg mt-4" data-form="loadReport">Submit</button>
         </div>
 
-        <label class="label">Trailer#</label>
-        <input id="sp_trailer" class="input" placeholder="445130">
+        <!-- ====================== SHIPPER PICKUP FORM ====================== -->
+        <div id="shipperPickup" class="hidden-form fade form-box">
+            <h2 class="title">Shipper Pick-up</h2>
 
-        <hr class="divider">
+            <label class="label">Broker</label>
+            <div id="brokerNameDisplay" class="readonly-box"></div>
 
-        <h3 class="font-bold text-lg">📄 BOL</h3>
-        <label class="check"><input id="sp_match" type="checkbox"> Shipper &
+            <label class="label">ID#</label>
+            <div id="brokerIdDisplay" class="readonly-box"></div>
+
+            <hr class="divider">
+
+            <h3 class="font-bold text-lg">♻️ SHIPPER PICK-UP</h3>
+
+            <label class="label">Location</label>
+            <textarea id="sp_location" class="textarea" placeholder="Gooding, ID 83330"></textarea>
+
+            <div class="flex gap-4">
+                <div class="w-1/2">
+                    <label class="label">Check-in</label>
+                    <input id="sp_checkin" type="time" class="input">
+                </div>
+                <div class="w-1/2">
+                    <label class="label">Check-out</label>
+                    <input id="sp_checkout" type="time" class="input">
+                </div>
+            </div>
+
+            <label class="label">Trailer#</label>
+            <input id="sp_trailer" class="input" placeholder="445130">
+
+            <hr class="divider">
+
+            <h3 class="font-bold text-lg">📄 BOL</h3>
+            <label class="check"><input id="sp_match" type="checkbox"> Shipper &
           Receiver Matches</label>
-        <label class="check"><input id="sp_pages" type="checkbox"> With all
+            <label class="check"><input id="sp_pages" type="checkbox"> With all
           pages & Clear</label>
-        <label class="check"><input id="sp_seal" type="checkbox"> Seal intact &
+            <label class="check"><input id="sp_seal" type="checkbox"> Seal intact &
           matches</label>
 
-        <label class="label mt-4">Status Updated</label>
-        <input id="sp_statusUpdated" class="input">
+            <label class="label mt-4">Status Updated</label>
+            <input id="sp_statusUpdated" class="input">
 
-        <label class="label mt-3">GTG by Broker</label>
-        <input id="sp_gtg" class="input">
+            <label class="label mt-3">GTG by Broker</label>
+            <input id="sp_gtg" class="input">
 
-        <button
-          class="submit-btn bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg mt-4"
-          data-form="shipperPickup">Submit</button>
-      </div>
-
-      <!-- ====================== RECEIVER DELIVERY FORM ====================== -->
-      <div id="receiverDelivery" class="hidden-form fade form-box">
-        <h2 class="title">Receiver Delivery</h2>
-
-        <label class="label">Receiver Location</label>
-        <input id="rd_location" class="input"
-          placeholder="Fort Pierce, FL 34981">
-
-        <div class="flex gap-4">
-          <div class="w-1/2">
-            <label class="label">Check-in</label>
-            <input id="rd_checkin" type="datetime-local" class="input">
-          </div>
-          <div class="w-1/2">
-            <label class="label">Check-out</label>
-            <input id="rd_checkout" type="datetime-local" class="input">
-          </div>
+            <button class="submit-btn bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg mt-4" data-form="shipperPickup">Submit</button>
         </div>
 
-        <label class="label">Dropped Trailer #</label>
-        <input id="rd_droppedTrailer" class="input" placeholder="TA156396">
+        <!-- ====================== RECEIVER DELIVERY FORM ====================== -->
+        <div id="receiverDelivery" class="hidden-form fade form-box">
+            <h2 class="title">Receiver Delivery</h2>
 
-        <hr class="divider">
+            <label class="label">Receiver Location</label>
+            <input id="rd_location" class="input" placeholder="Fort Pierce, FL 34981">
 
-        <h3 class="font-bold text-lg">📝 PROOF OF DELIVERY (POD)</h3>
-        <label class="check"><input id="rd_seal" type="checkbox"> Seal
+            <div class="flex gap-4">
+                <div class="w-1/2">
+                    <label class="label">Check-in</label>
+                    <input id="rd_checkin" type="datetime-local" class="input">
+                </div>
+                <div class="w-1/2">
+                    <label class="label">Check-out</label>
+                    <input id="rd_checkout" type="datetime-local" class="input">
+                </div>
+            </div>
+
+            <label class="label">Dropped Trailer #</label>
+            <input id="rd_droppedTrailer" class="input" placeholder="TA156396">
+
+            <hr class="divider">
+
+            <h3 class="font-bold text-lg">📝 PROOF OF DELIVERY (POD)</h3>
+            <label class="check"><input id="rd_seal" type="checkbox"> Seal
           intact</label>
-        <label class="check"><input id="rd_osd" type="checkbox"> OS&D
+            <label class="check"><input id="rd_osd" type="checkbox"> OS&D
           (Over/Short/Damage)</label>
-        <label class="check"><input id="rd_signature" type="checkbox"> Signature
+            <label class="check"><input id="rd_signature" type="checkbox"> Signature
           or Stamp</label>
-        <label class="check"><input id="rd_clear" type="checkbox"> With all
+            <label class="check"><input id="rd_clear" type="checkbox"> With all
           pages & Clear</label>
 
-        <hr class="divider">
+            <hr class="divider">
 
-        <label class="check"><input id="rd_images" type="checkbox"> Trailer&Seal
+            <label class="check"><input id="rd_images" type="checkbox"> Trailer&Seal
           Images</label>
-        <label class="check"><input id="rd_tracking" type="checkbox"> 📲📍App &
+            <label class="check"><input id="rd_tracking" type="checkbox"> 📲📍App &
           Tracking</label>
 
-        <hr class="divider">
+            <hr class="divider">
 
-        <label class="label">Empty trailer picked up from RECEIVER #</label>
-        <input id="rd_emptyTrailer" class="input" placeholder="TA159020">
+            <label class="label">Empty trailer picked up from RECEIVER #</label>
+            <input id="rd_emptyTrailer" class="input" placeholder="TA159020">
 
-        <label class="label">Drop-off location for empty trailer</label>
-        <input id="rd_dropoffLocation" class="input" placeholder>
+            <label class="label">Drop-off location for empty trailer</label>
+            <input id="rd_dropoffLocation" class="input" placeholder>
 
-        <button
-          class="submit-btn bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg mt-4"
-          data-form="receiverDelivery">Submit</button>
-      </div>
-
-      <!-- ====================== POD FULL DELIVERY FORM ====================== -->
-      <div id="receiverFullPod" class="hidden-form fade form-box">
-        <h2 class="title">POD Full Delivery</h2>
-
-        <label class="label">Receiver Location (optional)</label>
-        <input id="pod_location" class="input" placeholder="Pasadena, TX 77507">
-
-        <div class="flex gap-4">
-          <div class="w-1/2">
-            <label class="label">Check-in</label>
-            <input id="pod_checkin" type="datetime-local" class="input">
-          </div>
-          <div class="w-1/2">
-            <label class="label">Check-out</label>
-            <input id="pod_checkout" type="datetime-local" class="input">
-          </div>
+            <button class="submit-btn bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg mt-4" data-form="receiverDelivery">Submit</button>
         </div>
 
-        <hr class="divider">
+        <!-- ====================== POD FULL DELIVERY FORM ====================== -->
+        <div id="receiverFullPod" class="hidden-form fade form-box">
+            <h2 class="title">POD Full Delivery</h2>
 
-        <h3 class="font-bold text-lg">📝 PROOF OF DELIVERY (POD)</h3>
-        <label class="check"><input id="pod_seal" type="checkbox"> Seal
+            <label class="label">Receiver Location (optional)</label>
+            <input id="pod_location" class="input" placeholder="Pasadena, TX 77507">
+
+            <div class="flex gap-4">
+                <div class="w-1/2">
+                    <label class="label">Check-in</label>
+                    <input id="pod_checkin" type="datetime-local" class="input">
+                </div>
+                <div class="w-1/2">
+                    <label class="label">Check-out</label>
+                    <input id="pod_checkout" type="datetime-local" class="input">
+                </div>
+            </div>
+
+            <hr class="divider">
+
+            <h3 class="font-bold text-lg">📝 PROOF OF DELIVERY (POD)</h3>
+            <label class="check"><input id="pod_seal" type="checkbox"> Seal
           intact</label>
-        <label class="check"><input id="pod_osd" type="checkbox"> OS&D
+            <label class="check"><input id="pod_osd" type="checkbox"> OS&D
           (Over/Short/Damage)</label>
-        <label class="check"><input id="pod_signature" type="checkbox">
+            <label class="check"><input id="pod_signature" type="checkbox">
           Signature or Stamp</label>
-        <label class="check"><input id="pod_date" type="checkbox"> Date On
+            <label class="check"><input id="pod_date" type="checkbox"> Date On
           POD</label>
-        <label class="check"><input id="pod_clear" type="checkbox"> With all
+            <label class="check"><input id="pod_clear" type="checkbox"> With all
           pages & Clear</label>
 
-        <label class="label mt-4">Status Updated</label>
-        <input id="pod_statusUpdated" class="input">
+            <label class="label mt-4">Status Updated</label>
+            <input id="pod_statusUpdated" class="input">
 
-        <label class="label mt-3">GTG by Broker</label>
-        <input id="pod_gtg" class="input">
+            <label class="label mt-3">GTG by Broker</label>
+            <input id="pod_gtg" class="input">
 
-        <button
-          class="submit-btn bg-yellow-500 hover:bg-yellow-400 px-4 py-2 rounded-lg mt-4"
-          data-form="receiverFullPod">Submit</button>
-      </div>
+            <button class="submit-btn bg-yellow-500 hover:bg-yellow-400 px-4 py-2 rounded-lg mt-4" data-form="receiverFullPod">Submit</button>
+        </div>
 
-      <!-- ========================= WEBSOCKET + LOGIC ========================= -->
-      <script>
-// ======================== USER ID FROM TELEGRAM WEBAPP ========================
-const tg = window.Telegram.WebApp;
-tg.expand(); // fullscreen qilish
+        <!-- ========================= WEBSOCKET + LOGIC ========================= -->
+        <script>
+            // ======================== USER ID FROM TELEGRAM WEBAPP ========================
+            const tg = window.Telegram.WebApp;
+            tg.expand(); // fullscreen qilish
 
-// 1) Asosiy manba: Telegram user ID
-let userId = tg.initDataUnsafe?.user?.id;
-console.log("🔵 TELEGRAM USER ID Web appni o'zidan oqib olindi =", userId);
+            // 1) Asosiy manba: Telegram user ID
+            let userId = tg.initDataUnsafe.user.id;
+            console.log("🔵 TELEGRAM USER ID Web appni o'zidan oqib olindi =", userId);
 
-// 2) WebApp bo‘lmasa test payti URL fallback
-if (!userId) {
-  userId = new URLSearchParams(window.location.search).get("user");
-  console.log("🟠 URL USER =", userId);
-}
+            // 2) WebApp bo‘lmasa test payti URL fallback
+            if (!userId) {
+                userId = new URLSearchParams(window.location.search).get("user");
+                console.log("🟠 URL USER =", userId);
+            }
 
-// 3) Agar baribir bo‘lmasa (old test defaulti)
-// if (!userId || userId === "null" || userId === "undefined") {
-//   userId = "1912055376";
-// }
-// console.log("🟩 FINAL USER ID =", userId);
+            // 3) Agar baribir bo‘lmasa (old test defaulti)
+            // if (!userId || userId === "null" || userId === "undefined") {
+            //   userId = "1912055376";
+            // }
+            // console.log("🟩 FINAL USER ID =", userId);
 
 
-// ======================== GLOBAL SESSION ========================
-let GLOBAL = JSON.parse(localStorage.getItem("pickupSession")) || {
-  broker: "",
-  brokerId: "",
-  load: "",
-  groupChatId: "",
-  replyMessageId: ""
-};
+            // ======================== GLOBAL SESSION ========================
+            let GLOBAL = JSON.parse(localStorage.getItem("pickupSession")) || {
+                broker: "",
+                brokerId: "",
+                load: "",
+                groupChatId: "",
+                replyMessageId: ""
+            };
 
-// restore UI if present
-if (GLOBAL.broker) {
-  document.getElementById("autoBroker").innerText = GLOBAL.broker;
-  document.getElementById("autoBrokerId").innerText = GLOBAL.brokerId;
-  document.getElementById("brokerNameDisplay").innerText = GLOBAL.broker;
-  document.getElementById("brokerIdDisplay").innerText = GLOBAL.brokerId;
-  showForm("loadReport");
-}
-
-
-// ======================== WEBSOCKET CONNECT ========================
-const ws = new WebSocket("wss://websocket.nvmailer.uz/?user=" + userId);
-
-ws.onopen = () => {
-  console.log("🟢 WS CONNECTED");
-
-  ws.send(JSON.stringify({
-    type: "register",
-    clientId: "front"
-  }));
-  console.log("🟦 REGISTER SENT");
-};
-
-ws.onerror = (err) => console.log("🔴 WS ERROR:", err);
-ws.onclose = () => console.log("🟠 WS CLOSED");
+            // restore UI if present
+            if (GLOBAL.broker) {
+                document.getElementById("autoBroker").innerText = GLOBAL.broker;
+                document.getElementById("autoBrokerId").innerText = GLOBAL.brokerId;
+                document.getElementById("brokerNameDisplay").innerText = GLOBAL.broker;
+                document.getElementById("brokerIdDisplay").innerText = GLOBAL.brokerId;
+                showForm("loadReport");
+            }
 
 
-// ======================== HANDLE INCOMING WS MSG ========================
-ws.onmessage = (event) => {
-  console.log("⬇️ RAW WS:", event.data);
+            // ======================== WEBSOCKET CONNECT ========================
+            const ws = new WebSocket("wss://websocket.nvmailer.uz/?user=" + userId);
 
-  let data;
-  try {
-    data = JSON.parse(event.data);
-  } catch {
-    console.log("JSON ERROR");
-    return;
-  }
+            ws.onopen = () => {
+                console.log("🟢 WS CONNECTED");
 
-  console.log("🟦 PARSED:", data);
+                ws.send(JSON.stringify({
+                    type: "register",
+                    clientId: "front"
+                }));
+                console.log("🟦 REGISTER SENT");
+            };
 
-  // Wrong user
-  if (data.targetUserId && String(data.targetUserId) !== String(userId)) {
-    console.log("↩️ NOT THIS USER");
-    return;
-  }
-
-  // PICKUP DATA
-  if (
-    data.type === "PICKUP_DATA" ||
-    data.type === "pickup" ||
-    (!data.type && data.broker)
-  ) {
-    console.log("🟢 PICKUP RECEIVED");
-
-    clearAllForms();
-
-    GLOBAL = {
-      broker: data.broker || data.id || "",
-      brokerId: data.id || data.brokerId || "",
-      load: data.load || "",
-      groupChatId: data.groupChatId || "",
-      replyMessageId: data.replyMessageId || ""
-    };
-
-    localStorage.setItem("pickupSession", JSON.stringify(GLOBAL));
-    console.log("💾 SAVED", GLOBAL);
-
-    document.getElementById("autoBroker").innerText = GLOBAL.broker;
-    document.getElementById("autoBrokerId").innerText = GLOBAL.brokerId;
-    document.getElementById("brokerNameDisplay").innerText = GLOBAL.broker;
-    document.getElementById("brokerIdDisplay").innerText = GLOBAL.brokerId;
-
-    showForm("loadReport");
-  }
-};
+            ws.onerror = (err) => console.log("🔴 WS ERROR:", err);
+            ws.onclose = () => console.log("🟠 WS CLOSED");
 
 
-// ======================== FORM SUBMISSION ========================
-document.querySelectorAll(".submit-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const formType = btn.dataset.form;
+            // ======================== HANDLE INCOMING WS MSG ========================
+            ws.onmessage = (event) => {
+                console.log("⬇️ RAW WS:", event.data);
 
-    let payload = {
-      formType,
-      userId,
-      broker: GLOBAL.broker,
-      brokerId: GLOBAL.brokerId,
-      load: GLOBAL.load,
-      groupChatId: GLOBAL.groupChatId,
-      replyMessageId: GLOBAL.replyMessageId
-    };
+                let data;
+                try {
+                    data = JSON.parse(event.data);
+                } catch {
+                    console.log("JSON ERROR");
+                    return;
+                }
 
-    // LOAD REPORT
-    if (formType === "loadReport") {
-      payload = {
-        ...payload,
-        emptyTrailer: emptyTrailer.value,
-        puLocation: puLocation.value,
-        puCheckIn: puCheckIn.value,
-        puCheckOut: puCheckOut.value,
-        preloadedTrailer: preloadedTrailer.value,
-        bolMatch: bolMatch.checked,
-        bolSeal: bolSeal.checked,
-        bolPages: bolPages.checked,
-        trailerImages: trailerImages.checked,
-        tracking: tracking.checked,
-      };
-    }
+                console.log("🟦 PARSED:", data);
 
-    // SHIPPER PICKUP
-    if (formType === "shipperPickup") {
-      payload = {
-        ...payload,
-        sp_location: sp_location.value,
-        sp_checkin: sp_checkin.value,
-        sp_checkout: sp_checkout.value,
-        sp_trailer: sp_trailer.value,
-        sp_match: sp_match.checked,
-        sp_pages: sp_pages.checked,
-        sp_seal: sp_seal.checked,
-        sp_statusUpdated: sp_statusUpdated.value,
-        sp_gtg: sp_gtg.value,
-      };
-    }
+                // Wrong user
+                if (data.targetUserId && String(data.targetUserId) !== String(userId)) {
+                    console.log("↩️ NOT THIS USER");
+                    return;
+                }
 
-    // RECEIVER DELIVERY
-    if (formType === "receiverDelivery") {
-      payload = {
-        ...payload,
-        rd_location: rd_location.value,
-        rd_checkin: rd_checkin.value,
-        rd_checkout: rd_checkout.value,
-        rd_droppedTrailer: rd_droppedTrailer.value,
-        rd_seal: rd_seal.checked,
-        rd_osd: rd_osd.checked,
-        rd_signature: rd_signature.checked,
-        rd_clear: rd_clear.checked,
-        rd_images: rd_images.checked,
-        rd_tracking: rd_tracking.checked,
-        rd_emptyTrailer: rd_emptyTrailer.value,
-        rd_dropoffLocation: rd_dropoffLocation.value
-      };
-    }
+                // PICKUP DATA
+                if (
+                    data.type === "PICKUP_DATA" ||
+                    data.type === "pickup" ||
+                    (!data.type && data.broker)
+                ) {
+                    console.log("🟢 PICKUP RECEIVED");
 
-    // POD FULL
-    if (formType === "receiverFullPod") {
-      payload = {
-        ...payload,
-        pod_location: pod_location.value,
-        pod_checkin: pod_checkin.value,
-        pod_checkout: pod_checkout.value,
-        pod_seal: pod_seal.checked,
-        pod_osd: pod_osd.checked,
-        pod_signature: pod_signature.checked,
-        pod_date: pod_date.checked,
-        pod_clear: pod_clear.checked,
-        pod_statusUpdated: pod_statusUpdated.value,
-        pod_gtg: pod_gtg.value
-      };
-    }
+                    clearAllForms();
 
-    ws.send(JSON.stringify({
-      type: "send_to_bot",
-      payload
-    }));
-    setTimeout(() => {
-  clearAllForms();
-}, 50);
-  });
-});
-</script>
+                    GLOBAL = {
+                        broker: data.broker || data.id || "",
+                        brokerId: data.id || data.brokerId || "",
+                        load: data.load || "",
+                        groupChatId: data.groupChatId || "",
+                        replyMessageId: data.replyMessageId || ""
+                    };
+
+                    localStorage.setItem("pickupSession", JSON.stringify(GLOBAL));
+                    console.log("💾 SAVED", GLOBAL);
+
+                    document.getElementById("autoBroker").innerText = GLOBAL.broker;
+                    document.getElementById("autoBrokerId").innerText = GLOBAL.brokerId;
+                    document.getElementById("brokerNameDisplay").innerText = GLOBAL.broker;
+                    document.getElementById("brokerIdDisplay").innerText = GLOBAL.brokerId;
+
+                    showForm("loadReport");
+                }
+            };
+
+
+            // ======================== FORM SUBMISSION ========================
+            document.querySelectorAll(".submit-btn").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const formType = btn.dataset.form;
+
+                    let payload = {
+                        formType,
+                        userId,
+                        broker: GLOBAL.broker,
+                        brokerId: GLOBAL.brokerId,
+                        load: GLOBAL.load,
+                        groupChatId: GLOBAL.groupChatId,
+                        replyMessageId: GLOBAL.replyMessageId
+                    };
+
+                    // LOAD REPORT
+                    if (formType === "loadReport") {
+                        payload = {
+                            ...payload,
+                            emptyTrailer: emptyTrailer.value,
+                            puLocation: puLocation.value,
+                            puCheckIn: puCheckIn.value,
+                            puCheckOut: puCheckOut.value,
+                            preloadedTrailer: preloadedTrailer.value,
+                            bolMatch: bolMatch.checked,
+                            bolSeal: bolSeal.checked,
+                            bolPages: bolPages.checked,
+                            trailerImages: trailerImages.checked,
+                            tracking: tracking.checked,
+                        };
+                    }
+
+                    // SHIPPER PICKUP
+                    if (formType === "shipperPickup") {
+                        payload = {
+                            ...payload,
+                            sp_location: sp_location.value,
+                            sp_checkin: sp_checkin.value,
+                            sp_checkout: sp_checkout.value,
+                            sp_trailer: sp_trailer.value,
+                            sp_match: sp_match.checked,
+                            sp_pages: sp_pages.checked,
+                            sp_seal: sp_seal.checked,
+                            sp_statusUpdated: sp_statusUpdated.value,
+                            sp_gtg: sp_gtg.value,
+                        };
+                    }
+
+                    // RECEIVER DELIVERY
+                    if (formType === "receiverDelivery") {
+                        payload = {
+                            ...payload,
+                            rd_location: rd_location.value,
+                            rd_checkin: rd_checkin.value,
+                            rd_checkout: rd_checkout.value,
+                            rd_droppedTrailer: rd_droppedTrailer.value,
+                            rd_seal: rd_seal.checked,
+                            rd_osd: rd_osd.checked,
+                            rd_signature: rd_signature.checked,
+                            rd_clear: rd_clear.checked,
+                            rd_images: rd_images.checked,
+                            rd_tracking: rd_tracking.checked,
+                            rd_emptyTrailer: rd_emptyTrailer.value,
+                            rd_dropoffLocation: rd_dropoffLocation.value
+                        };
+                    }
+
+                    // POD FULL
+                    if (formType === "receiverFullPod") {
+                        payload = {
+                            ...payload,
+                            pod_location: pod_location.value,
+                            pod_checkin: pod_checkin.value,
+                            pod_checkout: pod_checkout.value,
+                            pod_seal: pod_seal.checked,
+                            pod_osd: pod_osd.checked,
+                            pod_signature: pod_signature.checked,
+                            pod_date: pod_date.checked,
+                            pod_clear: pod_clear.checked,
+                            pod_statusUpdated: pod_statusUpdated.value,
+                            pod_gtg: pod_gtg.value
+                        };
+                    }
+
+                    ws.send(JSON.stringify({
+                        type: "send_to_bot",
+                        payload
+                    }));
+                    setTimeout(() => {
+                        document.querySelectorAll("input[type='text'], input[type='time'], input[type='datetime-local']").forEach(el => el.value = "");
+                        document.querySelectorAll("textarea").forEach(el => el.value = "");
+                        document.querySelectorAll("input[type='checkbox']").forEach(el => el.checked = false);
+                    }, 50);
+
+                });
+            });
+        </script>
 
     </div>
-  </body>
+</body>
+
 </html>
