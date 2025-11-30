@@ -502,11 +502,8 @@
                         payload
                     }));
                     setTimeout(() => {
-                        document.querySelectorAll("input[type='text'], input[type='time'], input[type='datetime-local']").forEach(el => el.value = "");
-                        document.querySelectorAll("textarea").forEach(el => el.value = "");
-                        document.querySelectorAll("input[type='checkbox']").forEach(el => el.checked = false);
-                    }, 50);
-
+                        window.location.reload();
+                    }, 300);
                 });
             });
         </script>
