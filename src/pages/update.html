@@ -315,15 +315,15 @@
             console.log("🔵 TELEGRAM USER ID Web appni o'zidan oqib olindi =", userId);
 
             // 2) WebApp bo‘lmasa test payti URL fallback
-            if (!userId) {
-                userId = new URLSearchParams(window.location.search).get("user");
-                console.log("🟠 URL USER =", userId);
-            }
+            // if (!userId) {
+            //     userId = new URLSearchParams(window.location.search).get("user");
+            //     console.log("🟠 URL USER =", userId);
+            // }
 
             // 3) Agar baribir bo‘lmasa (old test defaulti)
-            if (!userId || userId === "null" || userId === "undefined") {
-                userId = "1912055376";
-            }
+            // if (!userId || userId === "null" || userId === "undefined") {
+            //     userId = "1912055376";
+            // }
             // console.log("🟩 FINAL USER ID =", userId);
 
 
