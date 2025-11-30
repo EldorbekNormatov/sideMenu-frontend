@@ -307,12 +307,13 @@
         <!-- ========================= WEBSOCKET + LOGIC ========================= -->
         <script>
             // ======================== USER ID FROM TELEGRAM WEBAPP ========================
-            const tg = window.Telegram?.WebApp;
-            tg?.expand(); // fullscreen qilish
+            const tg = window.Telegram ?.WebApp;
+            tg ?.expand(); // fullscreen qilish
+            tg ?.ready();
 
             // 1) Asosiy manba: Telegram user ID
             let userId = tg?.initDataUnsafe?.user?.id;
-            console.log("🔵 TELEGRAM USER ID Web appni o'zidan oqib olindi =", userId);
+            alert("🔵 TELEGRAM USER ID Web appni o'zidan oqib olindi =", userId);
 
             // 2) WebApp bo‘lmasa test payti URL fallback
             // if (!userId) {
@@ -321,9 +322,9 @@
             // }
 
             // 3) Agar baribir bo‘lmasa (old test defaulti)
-            // if (!userId || userId === "null" || userId === "undefined") {
-            //     userId = "1912055376";
-            // }
+            if (!userId || userId === "null" || userId === "undefined") {
+                userId = "1912055376";
+            }
             // console.log("🟩 FINAL USER ID =", userId);
 
 
