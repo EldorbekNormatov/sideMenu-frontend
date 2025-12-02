@@ -321,11 +321,11 @@ let savedId = localStorage.getItem("tg_user_id");
 let tgId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
 
 // 4) userId final birlashtirish
-let userId = tgId || uidFromUrl || savedId || "1912055376";
+let userId = tgId || uidFromUrl || savedId;
 
 // 5) Agar baribir bo‘lmasa xabar chiqsin
 if (!userId) {
-    alert("❗ User ID topilmadi. Iltimos, Telegram botdan oching.");
+    alert("❗ User ID not found. Please open the WebApp from the Telegram bot.");
 } else {
     localStorage.setItem("tg_user_id", userId);
 }
