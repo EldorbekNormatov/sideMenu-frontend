@@ -508,8 +508,8 @@ if (!userId) {
                     localStorage.removeItem("pickupSession");
                     clearAllForms();
                     setTimeout(() => {
-                        location.reload();
-                    }, 400);
+    window.location.href = window.location.origin + window.location.pathname + "?reload=" + Date.now();
+}, 300);
                 });
             });
         </script>
