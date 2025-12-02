@@ -85,29 +85,37 @@
   // URL PARAMS
   const params = new URLSearchParams(window.location.search);
   const uidFromUrl = params.get("uid");
-  const firstName = params.get("first_name");
-  const lastName = params.get("last_name");
+  const firstNameFromUrl = params.get("first_name");
+const lastNameFromUrl = params.get("last_name");
 
   // 1) Agar URL’da user ID bo‘lsa — uni saqlaymiz
-  if (uidFromUrl) {
+ // USER ID SAQLASH
+if (uidFromUrl) {
     localStorage.setItem("tg_user_id", uidFromUrl);
-  }
+}
 
-  if (firstName || lastName) {
-    // 1) Agar ism ham familiya bo'lsa
+// FIRSTNAME / LASTNAME SAQLASH
+if (firstNameFromUrl) {
+    localStorage.setItem("tg_first_name", firstNameFromUrl);
+}
+if (lastNameFromUrl) {
+    localStorage.setItem("tg_last_name", lastNameFromUrl);
+}
+
+// LOCALDAN OQISH
+const firstName = firstNameFromUrl || localStorage.getItem("tg_first_name");
+const lastName = lastNameFromUrl || localStorage.getItem("tg_last_name");
+
+// ALERT LOGIC
+if (firstName || lastName) {
     if (firstName && lastName) {
         alert(`Welcome, ${firstName} ${lastName}!`);
-    }
-    // 2) Faqat ism bo'lsa
-    else if (firstName) {
+    } else if (firstName) {
         alert(`Welcome, ${firstName}!`);
-    }
-    // 3) Faqat familiya bo'lsa
-    else {
+    } else {
         alert(`Welcome, ${lastName}!`);
     }
 } else {
-    // 4) Ikkalasi ham bo'lmasa
     alert("Please restart the WebApp.");
 }
   // 2) Hamma sahifa uchun umumiy ID
