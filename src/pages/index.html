@@ -83,18 +83,22 @@
   /* ========================= USER ID MANAGEMENT ========================== */
 
   // URL PARAMS
-  const params = new URLSearchParams(window.location.search);
-  const uidFromUrl = params.get("uid");
-  const firstNameFromUrl = params.get("first_name");
+ const params = new URLSearchParams(window.location.search);
+
+const uidFromUrl = params.get("uid");
+const firstNameFromUrl = params.get("first_name");
 const lastNameFromUrl = params.get("last_name");
 
-  // 1) Agar URL’da user ID bo‘lsa — uni saqlaymiz
- // USER ID SAQLASH
+// ===========================
+// 1) USER ID SAQLAYMIZ
+// ===========================
 if (uidFromUrl) {
     localStorage.setItem("tg_user_id", uidFromUrl);
 }
 
-// FIRSTNAME / LASTNAME SAQLASH
+// ===========================
+// 2) ISM / FAMILIYA SAQLASH
+// ===========================
 if (firstNameFromUrl) {
     localStorage.setItem("tg_first_name", firstNameFromUrl);
 }
@@ -102,20 +106,34 @@ if (lastNameFromUrl) {
     localStorage.setItem("tg_last_name", lastNameFromUrl);
 }
 
-// LOCALDAN OQISH
-const firstName = firstNameFromUrl || localStorage.getItem("tg_first_name");
-const lastName = lastNameFromUrl || localStorage.getItem("tg_last_name");
+// ===========================
+// 3) LOCALDAN OQISH
+// ===========================
+const firstNameLocal = localStorage.getItem("tg_first_name");
+const lastNameLocal = localStorage.getItem("tg_last_name");
 
-// ALERT LOGIC
-if (firstName || lastName) {
-    if (firstName && lastName) {
-        alert(`Welcome, ${firstName} ${lastName}!`);
-    } else if (firstName) {
-        alert(`Welcome, ${firstName}!`);
+// ===========================
+// 4) ALERT FAQAT URLda kelgan payt chiqishi kerak
+// ===========================
+if (firstNameFromUrl || lastNameFromUrl) {
+
+    // 🔥 Faqat BIRINCHI kirishda alert chiqadi
+    if (firstNameFromUrl && lastNameFromUrl) {
+        alert(`Welcome, ${firstNameFromUrl} ${lastNameFromUrl}!`);
+    } else if (firstNameFromUrl) {
+        alert(`Welcome, ${firstNameFromUrl}!`);
     } else {
-        alert(`Welcome, ${lastName}!`);
+        alert(`Welcome, ${lastNameFromUrl}!`);
     }
+
+} else if (firstNameLocal || lastNameLocal) {
+
+    // 🔥 Local bor, demak eski user → alert chiqmaydi
+    // Hech narsa qilmaymiz
+
 } else {
+
+    // 🔥 Umuman ma'lumot yo'q
     alert("Please restart the WebApp.");
 }
   // 2) Hamma sahifa uchun umumiy ID
