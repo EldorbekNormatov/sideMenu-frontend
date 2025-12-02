@@ -85,13 +85,31 @@
   // URL PARAMS
   const params = new URLSearchParams(window.location.search);
   const uidFromUrl = params.get("uid");
+  const firstName = params.get("first_name");
+  const lastName = params.get("last_name");
 
   // 1) Agar URL’da user ID bo‘lsa — uni saqlaymiz
   if (uidFromUrl) {
     localStorage.setItem("tg_user_id", uidFromUrl);
   }
 
-  alert(uidFromUrl)
+  if (firstName || lastName) {
+    // 1) Agar ism ham familiya bo'lsa
+    if (firstName && lastName) {
+        alert(`Welcome, ${firstName} ${lastName}!`);
+    }
+    // 2) Faqat ism bo'lsa
+    else if (firstName) {
+        alert(`Welcome, ${firstName}!`);
+    }
+    // 3) Faqat familiya bo'lsa
+    else {
+        alert(`Welcome, ${lastName}!`);
+    }
+} else {
+    // 4) Ikkalasi ham bo'lmasa
+    alert("Please restart the WebApp.");
+}
   // 2) Hamma sahifa uchun umumiy ID
   const userId = localStorage.getItem("tg_user_id");
 

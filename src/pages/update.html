@@ -81,11 +81,11 @@
 
         <!-- BUTTONS -->
         <div class="grid grid-cols-2 gap-4 mb-8">
-            <button onclick="showForm('loadReport')" class="btn bg-blue-600 hover:bg-blue-700">Load Report</button>
-            <button onclick="showForm('shipperPickup')" class="btn bg-green-600 hover:bg-green-700">Shipper Pick-up</button>
-            <button onclick="showForm('receiverDelivery')" class="btn bg-purple-600 hover:bg-purple-700">Receiver
+            <button onclick="showForm('loadReport')" class="btn bg-blue-600 hover:bg-blue-700">PO Pick Up</button>
+            <button onclick="showForm('shipperPickup')" class="btn bg-green-600 hover:bg-green-700">VAN Pick Up</button>
+            <button onclick="showForm('receiverDelivery')" class="btn bg-purple-600 hover:bg-purple-700">PO
           Delivery</button>
-            <button onclick="showForm('receiverFullPod')" class="btn bg-yellow-500 hover:bg-yellow-400 text-black">POD Full
+            <button onclick="showForm('receiverFullPod')" class="btn bg-yellow-500 hover:bg-yellow-400 text-black">VAN
           Delivery</button>
         </div>
 
@@ -321,7 +321,7 @@ let savedId = localStorage.getItem("tg_user_id");
 let tgId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
 
 // 4) userId final birlashtirish
-let userId = tgId || uidFromUrl || savedId;
+let userId = tgId || uidFromUrl || savedId || "1912055376";
 
 // 5) Agar baribir bo‘lmasa xabar chiqsin
 if (!userId) {
@@ -329,19 +329,6 @@ if (!userId) {
 } else {
     localStorage.setItem("tg_user_id", userId);
 }
-
-            // 2) WebApp bo‘lmasa test payti URL fallback
-            // if (!userId) {
-            //     userId = new URLSearchParams(window.location.search).get("user");
-            //     console.log("🟠 URL USER =", userId);
-            // }
-
-            // 3) Agar baribir bo‘lmasa (old test defaulti)
-            // if (!userId || userId === "null" || userId === "undefined") {
-            //     userId = "1912055376";
-            // }
-            // console.log("🟩 FINAL USER ID =", userId);
-
 
             // ======================== GLOBAL SESSION ========================
             let GLOBAL = JSON.parse(localStorage.getItem("pickupSession")) || {
@@ -518,7 +505,11 @@ if (!userId) {
                         type: "send_to_bot",
                         payload
                     }));
+                    localStorage.removeItem("pickupSession");
                     clearAllForms();
+                    setTimeout(() => {
+                        location.reload();
+                    }, 400);
                 });
             });
         </script>
