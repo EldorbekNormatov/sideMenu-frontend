@@ -66,6 +66,11 @@
                  p-4 rounded-lg block transition shadow-sm">
           <p class="font-semibold">Update</p>
         </a>
+        <a id="captureLink"
+            class="menu-item bg-[#1F242B]/80 hover:bg-[#2B3138]
+                  p-4 rounded-lg block transition shadow-sm">
+          <p class="font-semibold">📸 Document Capture</p>
+        </a>
 
       </div>
     </div>
@@ -163,6 +168,16 @@ if (firstNameFromUrl || lastNameFromUrl) {
   if(q.length > 0) updateURL += "?" + q.join("&");
 
   document.getElementById("updateLink").href = updateURL;
+
+  /* ========================= CAPTURE LINK BUILDER ========================== */
+let captureURL = "capture.html";
+const c = [];
+if(group) c.push("group=" + encodeURIComponent(group));
+if(load) c.push("load=" + encodeURIComponent(load));
+if(broker) c.push("broker=" + encodeURIComponent(broker));
+if(userId) c.push("uid=" + encodeURIComponent(userId));
+if(c.length > 0) captureURL += "?" + c.join("&");
+document.getElementById("captureLink").href = captureURL;
 
 </script>
 
