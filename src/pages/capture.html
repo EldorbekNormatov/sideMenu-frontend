@@ -3,314 +3,334 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document Scanner Capture</title>
+    <title>Advanced Document Scanner</title>
 
     <!-- TailwindCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- OpenCV.js (document detection) -->
+    <!-- OpenCV.js -->
     <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+    <style>
+      #overlay-msg {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      #guide-box {
+        pointer-events: none;
+        border: 3px dashed rgba(255, 255, 255, 0.3);
+      }
+    </style>
   </head>
 
-  <body class="min-h-screen bg-slate-900 text-slate-50">
-    <div class="max-w-md mx-auto p-4 pb-8">
+  <body class="bg-slate-900 text-white min-h-screen">
+
+    <div class="max-w-md mx-auto p-4 pb-10 relative">
 
       <h2 class="text-xl font-semibold mb-3">Hujjatni rasmga olish</h2>
 
-      <!-- OPENCV LOADER -->
       <div id="cvLoader" class="mb-3 text-yellow-400 text-sm">
-        ⏳ OpenCV yuklanmoqda... (1–3s)
+        ⏳ OpenCV yuklanmoqda...
       </div>
 
-      <!-- Buttons -->
-      <div class="flex gap-3 mb-2">
-        <button
-          id="startBtn"
-          class="flex-1 px-4 py-2 rounded-full bg-slate-700 text-sm font-medium active:scale-95 transition"
-        >
+      <div class="flex gap-3 mb-3">
+        <button id="startBtn"
+                class="flex-1 px-4 py-2 rounded-full bg-slate-700 active:scale-95 transition">
           📸 Rasm olish
         </button>
-
-        <button
-          id="saveBtn"
-          class="flex-1 px-4 py-2 rounded-full bg-blue-600 text-sm font-medium active:scale-95 transition hidden"
-        >
+        <button id="saveBtn"
+                class="flex-1 px-4 py-2 rounded-full bg-blue-600 hidden active:scale-95 transition">
           💾 Yuborish
         </button>
       </div>
 
-      <!-- Status -->
-      <div id="status" class="text-xs text-slate-300 min-h-[20px]"></div>
+      <!-- STATUS -->
+      <p id="status" class="text-xs text-slate-300 min-h-[20px] mb-1"></p>
 
-      <!-- Loader -->
-      <div id="loader" class="hidden flex items-center gap-2 mt-2 text-xs text-slate-200">
-        <div class="w-5 h-5 border-2 border-slate-500 border-t-blue-500 rounded-full animate-spin"></div>
-        <span id="loaderText">Yuklanmoqda...</span>
-      </div>
+      <!-- CAMERA -->
+      <div id="camera-box" class="hidden relative">
 
-      <!-- Camera -->
-      <div id="camera-box" class="hidden mt-4 space-y-3">
-        <video id="video" autoplay playsinline class="w-full rounded-xl bg-black aspect-[3/4] object-cover"></video>
+        <!-- OVERLAY MESSAGE -->
+        <div id="overlay-msg"
+             class="px-3 py-1 bg-red-600/70 rounded-lg text-xs hidden z-20">
+          Hujjatni to‘g‘ri tuting
+        </div>
 
-        <button
-          id="captureBtn"
-          class="w-full px-4 py-2 rounded-full bg-emerald-500 text-sm font-medium active:scale-95 transition"
-        >
+        <!-- LIVE GUIDE BOX -->
+        <div id="guide-box"
+             class="absolute inset-0 z-10 rounded-xl hidden"></div>
+
+        <video id="video" autoplay playsinline
+               class="w-full rounded-xl bg-black aspect-[3/4] object-cover"></video>
+
+        <button id="captureBtn"
+                class="w-full mt-3 px-4 py-2 rounded-full bg-emerald-500 text-sm font-medium active:scale-95 transition">
           📷 Rasmni olish
         </button>
       </div>
 
-      <!-- Preview -->
-      <h3 class="mt-6 mb-1 text-sm font-semibold">Olingan rasmlar</h3>
+      <!-- PREVIEW -->
+      <h3 class="mt-6 mb-2 text-sm font-bold">Olingan rasmlar</h3>
       <div id="preview" class="space-y-2"></div>
     </div>
 
-    <script>
-      /* =====================================================
-            OPENCV READY CHECK
-      ====================================================== */
-      let cvReady = false;
+<script>
+/*=========================================
+    OPENCV READY
+=========================================*/
+let cvReady = false;
+function onOpenCvReady() {
+  cvReady = true;
+  document.getElementById("cvLoader").innerHTML = "✅ OpenCV yuklandi";
+}
+window.Module = { onRuntimeInitialized: onOpenCvReady };
 
-      function onOpenCvReady() {
-        cvReady = true;
-        document.getElementById("cvLoader").innerHTML =
-          "✅ OpenCV yuklandi. Rasm olish mumkin!";
-      }
+/*=========================================
+    GLOBAL VARS
+=========================================*/
+let stream = null;
+let images = [];
+let liveInterval = null;
 
-      window.Module = { onRuntimeInitialized: onOpenCvReady };
+/*=========================================
+    HELPERS
+=========================================*/
+const statusEl = document.getElementById("status");
+const previewEl = document.getElementById("preview");
+const saveBtn = document.getElementById("saveBtn");
 
-      /* ===================================================== */
+function setStatus(t){ statusEl.textContent = t; }
+function showOverlay(t){
+  const ov = document.getElementById("overlay-msg");
+  ov.textContent = t;
+  ov.classList.remove("hidden");
+}
+function hideOverlay(){
+  document.getElementById("overlay-msg").classList.add("hidden");
+}
 
-      let stream = null;
-      let images = [];
+/*=========================================
+    CAMERA START
+=========================================*/
+document.getElementById("startBtn").onclick = async () => {
+  if(!cvReady) return setStatus("❗ OpenCV yuklanishini kuting.");
 
-      const statusEl = document.getElementById("status");
-      const loader = document.getElementById("loader");
-      const loaderText = document.getElementById("loaderText");
-      const previewEl = document.getElementById("preview");
-      const saveBtn = document.getElementById("saveBtn");
+  setStatus("Kamera ochilmoqda...");
 
-      function setStatus(msg) {
-        statusEl.textContent = msg;
-      }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
 
-      function showLoader(msg) {
-        loaderText.textContent = msg;
-        loader.classList.remove("hidden");
-      }
+    document.getElementById("video").srcObject = stream;
+    document.getElementById("camera-box").classList.remove("hidden");
 
-      function hideLoader() {
-        loader.classList.add("hidden");
-      }
+    startLiveDocumentDetection();
+  }
+  catch(e){
+    setStatus("❌ Kamera ochilmadi");
+  }
+};
 
-      /* =====================================================
-            CAMERA START
-      ====================================================== */
-      document.getElementById("startBtn").onclick = startCamera;
+/*=========================================
+   LIVE DOCUMENT DETECTION (Real-time)
+=========================================*/
+function startLiveDocumentDetection(){
+  const video = document.getElementById("video");
 
-      async function startCamera() {
-        if (!cvReady) return setStatus("❗ OpenCV hali yuklanmagan. Biroz kuting.");
+  liveInterval = setInterval(async () => {
+    if(!video.videoWidth) return;
 
-        try {
-          showLoader("Kamera ochilmoqda...");
-          setStatus("Kamera ochilmoqda...");
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }
-          });
+    const ctx = canvas.getContext("2d", { willReadFrequently:true });
+    ctx.drawImage(video, 0, 0);
 
-          const video = document.getElementById("video");
-          video.srcObject = stream;
-          document.getElementById("camera-box").classList.remove("hidden");
-        } catch (e) {
-          setStatus("❌ Kamerani ochib bo‘lmadi");
-        } finally {
-          hideLoader();
-        }
+    const docOK = await detectDocument(canvas);
 
-        document.getElementById("captureBtn").onclick =
-          () => capturePhoto(document.getElementById("video"));
-      }
+    const guide = document.getElementById("guide-box");
 
-      /* =====================================================
-            CAPTURE PHOTO
-      ====================================================== */
-      async function capturePhoto(video) {
-        if (!video.videoWidth) return setStatus("Kamera tayyor emas");
+    if(docOK){
+      guide.classList.remove("hidden");
+      guide.style.borderColor = "rgba(0,255,0,0.7)";
+      hideOverlay();
+    } else {
+      guide.classList.remove("hidden");
+      guide.style.borderColor = "rgba(255,0,0,0.6)";
+      showOverlay("Hujjatni to‘liq kadrlang");
+    }
+  }, 400);
+}
 
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+/*=========================================
+    CAPTURE PHOTO (Tekshiruv bilan)
+=========================================*/
+document.getElementById("captureBtn").onclick = async () => {
+  const video = document.getElementById("video");
+  if(!video.videoWidth) return;
 
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        ctx.drawImage(video, 0, 0);
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
 
-        showLoader("Hujjat tekshirilmoqda...");
+  const ctx = canvas.getContext("2d", { willReadFrequently:true });
+  ctx.drawImage(video, 0, 0);
 
-        const blurry = await isImageBlurry(canvas);
-        const lighting = await checkLighting(canvas);
-        const docOK = await detectDocument(canvas);
+  setStatus("Tekshirilmoqda...");
 
-        hideLoader();
+  const blurry = await isImageBlurry(canvas);
+  const lighting = await checkLighting(canvas);
+  const docOK = await detectDocument(canvas);
 
-        if (blurry) return setStatus("❌ Xira rasm. Fokus qilib qayta oling.");
-        if (lighting === "dark") return setStatus("❌ Juda qorong‘i. Yorug‘ joyda oling.");
-        if (lighting === "bright") return setStatus("❌ Juda yorug‘. Soyada oling.");
-        if (!docOK) return setStatus("❌ Hujjatning 4 chekkasi ko‘rinmadi.");
+  if(blurry) return setStatus("❌ Rasm xira");
+  if(lighting==="dark") return setStatus("❌ Juda qorong‘i");
+  if(lighting==="bright") return setStatus("❌ Juda yorug‘");
+  if(!docOK) return setStatus("❌ Hujjatning 4 chekkasi chiqmagan");
 
-        const blob = await new Promise((res) =>
-          canvas.toBlob(res, "image/jpeg", 0.9)
-        );
+  const blob = await new Promise(res => canvas.toBlob(res, "image/jpeg", 0.9));
+  const url = URL.createObjectURL(blob);
 
-        const url = URL.createObjectURL(blob);
+  images.push({blob,url});
+  renderPreview();
 
-        images.push({ blob, url });
-        renderPreview();
+  saveBtn.classList.remove("hidden");
+  setStatus("Rasm saqlandi");
+};
 
-        saveBtn.classList.remove("hidden");
-        setStatus(`${images.length}-rasm saqlandi.`);
-      }
+/*=========================================
+   BLUR CHECK
+=========================================*/
+async function isImageBlurry(canvas, threshold = 60){
+  return new Promise((resolve)=>{
+    const scale = 256 / Math.max(canvas.width, canvas.height);
+    const w = Math.floor(canvas.width * scale);
+    const h = Math.floor(canvas.height * scale);
 
-      /* =====================================================
-            BLUR DETECTOR (with willReadFrequently)
-      ====================================================== */
-      async function isImageBlurry(canvas, threshold = 60) {
-        return new Promise((resolve) => {
-          const scale = 256 / Math.max(canvas.width, canvas.height);
-          const w = Math.floor(canvas.width * scale);
-          const h = Math.floor(canvas.height * scale);
+    const small = document.createElement("canvas");
+    small.width = w; small.height = h;
 
-          const small = document.createElement("canvas");
-          small.width = w;
-          small.height = h;
+    const sctx = small.getContext("2d",{willReadFrequently:true});
+    sctx.drawImage(canvas,0,0,w,h);
 
-          const sctx = small.getContext("2d", { willReadFrequently: true });
-          sctx.drawImage(canvas, 0, 0, w, h);
+    const {data} = sctx.getImageData(0,0,w,h);
 
-          const { data } = sctx.getImageData(0, 0, w, h);
+    let sum=0, sq=0;
+    for(let i=0;i<data.length;i+=4){
+      const g=(data[i]+data[i+1]+data[i+2])/3;
+      sum+=g; sq+=g*g;
+    }
 
-          let sum = 0,
-            sq = 0;
+    const n=data.length/4;
+    const variance = sq/n - (sum/n)**2;
 
-          for (let i = 0; i < data.length; i += 4) {
-            const g = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            sum += g;
-            sq += g * g;
+    resolve(variance < threshold);
+  });
+}
+
+/*=========================================
+   LIGHTING CHECK
+=========================================*/
+async function checkLighting(canvas){
+  const ctx = canvas.getContext("2d",{willReadFrequently:true});
+  const {data} = ctx.getImageData(0,0,canvas.width,canvas.height);
+
+  let sum=0,n=data.length/4;
+
+  for(let i=0;i<data.length;i+=4){
+    const b=(data[i]+data[i+1]+data[i+2])/3;
+    sum+=b;
+  }
+
+  const avg=sum/n;
+
+  if(avg<60) return "dark";
+  if(avg>200) return "bright";
+  return "normal";
+}
+
+/*=========================================
+   DOCUMENT DETECTION (4 CORNERS)
+=========================================*/
+async function detectDocument(canvas){
+  return new Promise((resolve)=>{
+    try{
+      let src=cv.imread(canvas);
+      let gray=new cv.Mat();
+      let blur=new cv.Mat();
+      let edges=new cv.Mat();
+      let contours=new cv.MatVector();
+      let hierarchy=new cv.Mat();
+
+      cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
+      cv.GaussianBlur(gray,blur,new cv.Size(5,5),0);
+      cv.Canny(blur,edges,60,140);
+      cv.findContours(edges,contours,hierarchy,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE);
+
+      let found=false;
+
+      for(let i=0;i<contours.size();i++){
+        let cnt=contours.get(i);
+        let peri=cv.arcLength(cnt,true);
+
+        let approx=new cv.Mat();
+        cv.approxPolyDP(cnt,approx,0.02*peri,true);
+
+        if(approx.rows===4){
+          const area=cv.contourArea(cnt);
+          if(area>60000){
+            found=true;
           }
-
-          const n = data.length / 4;
-          const variance = sq / n - (sum / n) ** 2;
-
-          resolve(variance < threshold);
-        });
-      }
-
-      /* =====================================================
-            LIGHTING CHECK (with willReadFrequently)
-      ====================================================== */
-      async function checkLighting(canvas) {
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        let sum = 0;
-        let n = data.length / 4;
-
-        for (let i = 0; i < data.length; i += 4) {
-          const b = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          sum += b;
         }
-
-        const avg = sum / n;
-
-        if (avg < 60) return "dark";
-        if (avg > 200) return "bright";
-        return "normal";
+        approx.delete();
       }
 
-      /* =====================================================
-            DOCUMENT DETECTOR (OpenCV)
-      ====================================================== */
-      async function detectDocument(canvas) {
-        return new Promise((resolve) => {
-          try {
-            let src = cv.imread(canvas);
-            let gray = new cv.Mat();
-            let blur = new cv.Mat();
-            let edges = new cv.Mat();
-            let contours = new cv.MatVector();
-            let hierarchy = new cv.Mat();
+      src.delete(); gray.delete(); blur.delete();
+      edges.delete(); contours.delete(); hierarchy.delete();
 
-            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-            cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
-            cv.Canny(blur, edges, 50, 150);
+      resolve(found);
+    } catch(e){
+      resolve(false);
+    }
+  });
+}
 
-            cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+/*=========================================
+   PREVIEW
+=========================================*/
+function renderPreview(){
+  previewEl.innerHTML="";
 
-            let found = false;
+  images.forEach((img,i)=>{
+    const box=document.createElement("div");
+    box.className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3";
 
-            for (let i = 0; i < contours.size(); i++) {
-              let cnt = contours.get(i);
-              let peri = cv.arcLength(cnt, true);
+    box.innerHTML=`
+      <img src="${img.url}" class="w-20 h-20 object-cover rounded-lg border border-slate-700"/>
+      <button data-i="${i}"
+              class="ml-auto px-2 py-1 bg-red-600 rounded-full text-xs">
+        🗑
+      </button>
+    `;
 
-              let approx = new cv.Mat();
-              cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+    previewEl.appendChild(box);
+  });
 
-              if (approx.rows === 4) {
-                const area = cv.contourArea(cnt);
-                if (area > 60000) {
-                  found = true;
-                }
-              }
-              approx.delete();
-            }
+  previewEl.querySelectorAll("button").forEach(btn=>{
+    btn.onclick=()=>{
+      const i=btn.dataset.i;
+      URL.revokeObjectURL(images[i].url);
+      images.splice(i,1);
+      renderPreview();
+      setStatus("O‘chirildi");
+    };
+  });
+}
 
-            src.delete();
-            gray.delete();
-            blur.delete();
-            edges.delete();
-            contours.delete();
-            hierarchy.delete();
+</script>
 
-            resolve(found);
-          } catch (e) {
-            resolve(false);
-          }
-        });
-      }
-
-      /* =====================================================
-            PREVIEW
-      ====================================================== */
-      function renderPreview() {
-        previewEl.innerHTML = "";
-
-        images.forEach((img, i) => {
-          const box = document.createElement("div");
-          box.className =
-            "bg-slate-800 border border-slate-700 p-3 rounded-xl flex items-center gap-3";
-
-          box.innerHTML = `
-            <img src="${img.url}" class="w-20 h-20 object-cover rounded-lg border border-slate-700" />
-            <div class="flex flex-col gap-1 ml-auto">
-              <button class="text-xs px-2 py-1 rounded-full bg-slate-700" data-a="remove" data-i="${i}">🗑</button>
-            </div>
-          `;
-
-          previewEl.appendChild(box);
-        });
-
-        previewEl.querySelectorAll("button[data-a='remove']").forEach(btn => {
-          btn.onclick = () => {
-            const i = btn.dataset.i;
-            URL.revokeObjectURL(images[i].url);
-            images.splice(i, 1);
-            renderPreview();
-            setStatus("Rasm o‘chirildi.");
-          };
-        });
-      }
-    </script>
-
-  </body>
+</body>
 </html>
