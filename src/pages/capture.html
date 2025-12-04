@@ -179,7 +179,7 @@ saveBtn.onclick = async () => {
   });
 
   try {
-    const resp = await fetch(`${API}/submit-documents`, {
+    const resp = await fetch(`${API}/photo-save`, {
       method: "POST",
       body: form
     });
