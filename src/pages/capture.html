@@ -13,17 +13,13 @@
 
       <!-- BUTTONS -->
       <div class="flex gap-3 mb-3">
-        <button
-          id="startBtn"
-          class="flex-1 bg-slate-700 p-3 rounded-full active:scale-95 transition"
-        >
+        <button id="startBtn"
+          class="flex-1 bg-slate-700 p-3 rounded-full active:scale-95 transition">
           📸 Kamerani ochish
         </button>
 
-        <button
-          id="saveBtn"
-          class="flex-1 bg-blue-600 p-3 rounded-full hidden active:scale-95 transition"
-        >
+        <button id="saveBtn"
+          class="flex-1 bg-blue-600 p-3 rounded-full hidden active:scale-95 transition">
           💾 Hamma rasmlarni yuborish
         </button>
       </div>
@@ -32,17 +28,11 @@
 
       <!-- CAMERA -->
       <div id="camera-box" class="hidden mt-4">
-        <video
-          id="video"
-          autoplay
-          playsinline
-          class="w-full rounded-xl bg-black aspect-[3/4] object-cover"
-        ></video>
+        <video id="video" autoplay playsinline
+          class="w-full rounded-xl bg-black aspect-[3/4] object-cover"></video>
 
-        <button
-          id="captureBtn"
-          class="w-full mt-3 bg-emerald-500 p-3 rounded-full active:scale-95 transition"
-        >
+        <button id="captureBtn"
+          class="w-full mt-3 bg-emerald-500 p-3 rounded-full active:scale-95 transition">
           📷 Rasmni olish
         </button>
       </div>
@@ -52,171 +42,165 @@
       <div id="preview" class="space-y-2 mt-2"></div>
     </div>
 
-    <script>
-      let stream = null;
-      let images = []; // backend tasdiqlagan rasmlar {blob,url}
+<script>
+/* ===========================
+     API BASE URL
+=========================== */
+const API = "https://panel.nvmailer.uz";  
+// Agar HTTPS bo‘lmasa:
+// const API = "http://panel.nvmailer.uz";  
 
-      const statusEl = document.getElementById("status");
-      const previewEl = document.getElementById("preview");
-      const saveBtn = document.getElementById("saveBtn");
+let stream = null;
+let images = [];  // backend tasdiqlagan rasmlar
 
-      function setStatus(text, color = "yellow") {
-        statusEl.textContent = text;
-        statusEl.classList.remove(
-          "text-red-400",
-          "text-green-400",
-          "text-yellow-300"
-        );
+const statusEl = document.getElementById("status");
+const previewEl = document.getElementById("preview");
+const saveBtn = document.getElementById("saveBtn");
 
-        if (color === "red") statusEl.classList.add("text-red-400");
-        else if (color === "green") statusEl.classList.add("text-green-400");
-        else statusEl.classList.add("text-yellow-300");
-      }
+function setStatus(text, color="yellow") {
+  statusEl.textContent = text;
+  statusEl.className =
+    color === "red" ? "text-red-400 text-xs" :
+    color === "green" ? "text-green-400 text-xs" :
+    "text-yellow-300 text-xs";
+}
 
-      /* ========================================================
-          KAMERA OCHISH
-      ======================================================== */
-      document.getElementById("startBtn").onclick = async () => {
-        try {
-          setStatus("Kamera ochilmoqda...");
+/* ===========================
+      KAMERA OCHISH
+=========================== */
+document.getElementById("startBtn").onclick = async () => {
+  try {
+    setStatus("Kamera ochilmoqda...");
 
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" },
-          });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
 
-          document.getElementById("video").srcObject = stream;
-          document
-            .getElementById("camera-box")
-            .classList.remove("hidden");
+    document.getElementById("video").srcObject = stream;
+    document.getElementById("camera-box").classList.remove("hidden");
 
-          setStatus("Kamera tayyor. Rasmga oling.", "green");
-        } catch (e) {
-          console.error(e);
-          setStatus("❌ Kamera ochilmadi", "red");
-        }
-      };
+    setStatus("Kamera tayyor. Rasmga oling.", "green");
+  } catch (e) {
+    console.error(e);
+    setStatus("❌ Kamera ochilmadi", "red");
+  }
+};
 
-      /* ========================================================
-          CAPTURE → BACKENDGA YUBORISH /photo-check
-      ======================================================== */
-      document.getElementById("captureBtn").onclick = async () => {
-        const video = document.getElementById("video");
-        if (!video.videoWidth)
-          return setStatus("Kamera tayyor emas", "red");
+/* ===========================
+   CAPTURE → BACKEND /photo-check
+=========================== */
+document.getElementById("captureBtn").onclick = async () => {
+  const video = document.getElementById("video");
+  if (!video.videoWidth) return setStatus("Kamera tayyor emas", "red");
 
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
 
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        ctx.drawImage(video, 0, 0);
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0);
 
-        setStatus("Rasm serverga yuborilyapti...");
+  setStatus("Rasm serverga yuborilyapti...");
 
-        const blob = await new Promise((res) =>
-          canvas.toBlob(res, "image/jpeg", 0.9)
-        );
+  const blob = await new Promise(res =>
+    canvas.toBlob(res, "image/jpeg", 0.9)
+  );
 
-        const form = new FormData();
-        form.append("photo", blob, "photo.jpg"); // backend: upload.single("photo")
+  const form = new FormData();
+  form.append("photo", blob, "photo.jpg");
 
-        try {
-          const resp = await fetch("http://localhost:4000/photo-check", {
-            method: "POST",
-            body: form,
-          });
-          const data = await resp.json();
-          console.log("photo-check:", data);
+  try {
+    const resp = await fetch(`${API}/photo-check`, {
+      method: "POST",
+      body: form
+    });
 
-          if (!data.ok) {
-            // backend rad etsa
-            setStatus(data.msg || "❌ Rasm yaroqsiz", "red");
-            return;
-          }
+    const data = await resp.json();
+    console.log("photo-check:", data);
 
-          // backend tasdiqladi → rasmni ro‘yxatga qo‘shamiz
-          const url = URL.createObjectURL(blob);
-          images.push({ blob, url });
+    if (!data.ok) {
+      setStatus(data.msg || "❌ Rasm yaroqsiz", "red");
+      return;
+    }
 
-          renderImages();
-          saveBtn.classList.remove("hidden");
+    // backend tasdiqladi → ro‘yxatga qo‘shamiz
+    const url = URL.createObjectURL(blob);
+    images.push({ blob, url });
 
-          setStatus(
-            "✔ Rasm qabul qilindi! Keyingi rasmni olishingiz mumkin.",
-            "green"
-          );
-        } catch (err) {
-          console.error(err);
-          setStatus("❌ Server bilan aloqa yo‘q", "red");
-        }
-      };
+    renderImages();
+    saveBtn.classList.remove("hidden");
 
-      /* ========================================================
-          PREVIEW RASMLAR
-      ======================================================== */
-      function renderImages() {
-        previewEl.innerHTML = "";
+    setStatus("✔ Rasm qabul qilindi! Keyingisini oling.", "green");
 
-        images.forEach((img, i) => {
-          previewEl.innerHTML += `
-          <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
-            <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover"/>
-            <button data-i="${i}"
-                    class="ml-auto px-2 py-1 bg-red-600 rounded-full text-xs">🗑 O'chirish</button>
-          </div>
-        `;
-        });
+  } catch (err) {
+    console.error(err);
+    setStatus("❌ Server bilan aloqa yo‘q", "red");
+  }
+};
 
-        document.querySelectorAll("button[data-i]").forEach((btn) => {
-          btn.onclick = () => {
-            images.splice(btn.dataset.i, 1);
-            renderImages();
-            if (images.length === 0) {
-              saveBtn.classList.add("hidden");
-            }
-          };
-        });
-      }
+/* ===========================
+      PREVIEW RASMLAR
+=========================== */
+function renderImages() {
+  previewEl.innerHTML = "";
 
-      /* ========================================================
-          OXIRIDA: BARCHA RASMLARNI BOSHQA ROUTE GA YUBORISH
-          POST /submit-documents   (backendda o‘zing yozasan)
-      ======================================================== */
-      saveBtn.onclick = async () => {
-        if (images.length === 0)
-          return setStatus("Avval kamida bitta rasm oling", "red");
+  images.forEach((img, i) => {
+    previewEl.innerHTML += `
+      <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
+        <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover"/>
+        <button data-i="${i}" class="ml-auto px-2 py-1 bg-red-600 rounded-full text-xs">
+          🗑 O'chirish
+        </button>
+      </div>
+    `;
+  });
 
-        setStatus("Hamma rasmlar yuborilyapti...");
+  document.querySelectorAll("button[data-i]").forEach(btn => {
+    btn.onclick = () => {
+      images.splice(btn.dataset.i, 1);
+      renderImages();
+      if (images.length === 0) saveBtn.classList.add("hidden");
+    };
+  });
+}
 
-        const form = new FormData();
-        images.forEach((img, i) => {
-          form.append("photos", img.blob, `photo_${i}.jpg`);
-        });
+/* ===========================
+   ALL PHOTOS → /submit-documents
+=========================== */
+saveBtn.onclick = async () => {
+  if (images.length === 0)
+    return setStatus("Avval kamida bitta rasm oling", "red");
 
-        try {
-          const resp = await fetch(
-            "http://localhost:4000/submit-documents",
-            {
-              method: "POST",
-              body: form,
-            }
-          );
-          const data = await resp.json();
-          console.log("submit-documents:", data);
+  setStatus("Hamma rasmlar yuborilyapti...");
 
-          if (data.ok) {
-            setStatus("✔ Hamma rasm muvaffaqiyatli yuborildi!", "green");
-            images = [];
-            renderImages();
-            saveBtn.classList.add("hidden");
-          } else {
-            setStatus(data.msg || "❌ Yuborishda xatolik", "red");
-          }
-        } catch (e) {
-          console.error(e);
-          setStatus("❌ Server bilan aloqa yo‘q", "red");
-        }
-      };
-    </script>
+  const form = new FormData();
+  images.forEach((img, i) => {
+    form.append("photos", img.blob, `photo_${i}.jpg`);
+  });
+
+  try {
+    const resp = await fetch(`${API}/submit-documents`, {
+      method: "POST",
+      body: form
+    });
+
+    const data = await resp.json();
+    console.log("submit-documents:", data);
+
+    if (data.ok) {
+      setStatus("✔ Hamma rasm yuborildi!", "green");
+      images = [];
+      renderImages();
+      saveBtn.classList.add("hidden");
+    } else {
+      setStatus(data.msg || "❌ Yuborishda xatolik", "red");
+    }
+  } catch (e) {
+    console.error(e);
+    setStatus("❌ Server bilan aloqa yo‘q", "red");
+  }
+};
+</script>
+
   </body>
 </html>
