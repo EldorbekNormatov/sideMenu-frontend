@@ -92,8 +92,6 @@ let torchOn = false;
 
 let cvReady = false;
 let lastQuad = null;
-let lastCenter = null;
-let isShaky = false;
 
 /* =========================== DOM refs */
 const statusEl = document.getElementById("status");
@@ -116,6 +114,9 @@ const focusRing = document.getElementById("focusRing");
   }, 100);
 })();
 
+/* ===========================
+      STATUS
+=========================== */
 function setStatus(text, color="yellow") {
   statusEl.textContent = text;
   statusEl.className =
@@ -126,6 +127,20 @@ function setStatus(text, color="yellow") {
 
 function setInfo(text) {
   infoOverlay.textContent = text || "";
+}
+
+/* ===========================
+   4 BURCHAK TEKSHIRISH (YANGI)
+=========================== */
+function isValidQuad(quad) {
+  if (!quad || quad.length !== 4) return false;
+
+  return quad.every(p =>
+    typeof p.x === "number" &&
+    typeof p.y === "number" &&
+    p.x > 5 &&
+    p.y > 5
+  );
 }
 
 /* ===========================
@@ -157,17 +172,17 @@ async function flashBurst() {
 }
 
 /* ===========================
-   AI doc ordering
+   ORDER QUAD
 =========================== */
 function orderQuad(pts) {
   const sum  = pts.map(p => p.x + p.y);
   const diff = pts.map(p => p.y - p.x);
 
   return [
-    pts[sum.indexOf(Math.min(...sum))], // tl
-    pts[diff.indexOf(Math.min(...diff))], // tr
-    pts[sum.indexOf(Math.max(...sum))], // br
-    pts[diff.indexOf(Math.max(...diff))] // bl
+    pts[sum.indexOf(Math.min(...sum))],
+    pts[diff.indexOf(Math.min(...diff))],
+    pts[sum.indexOf(Math.max(...sum))],
+    pts[diff.indexOf(Math.max(...diff))]
   ];
 }
 
@@ -248,7 +263,13 @@ function startDetectionLoop() {
       overlayCtx.strokeStyle = "lime";
       overlayCtx.stroke();
 
-      setInfo("📄 Document detected");
+      /* === YANGI: 4 BURCHAK ANIQLANGANINI TEKSHIRISH === */
+      if (!isValidQuad(lastQuad)) {
+        setInfo("Document corners not detected clearly");
+      } else {
+        setInfo("📄 Document detected");
+      }
+
     } else {
       lastQuad = null;
       setInfo("Show the entire document");
@@ -301,9 +322,6 @@ document.getElementById("startBtn").onclick = async () => {
 =========================== */
 document.getElementById("video").addEventListener("click", async (e) => {
   if (!videoTrack) return;
-
-  const caps = videoTrack.getCapabilities?.();
-  if (!caps?.focusMode) return;
 
   const video = document.getElementById("video");
   const rect = video.getBoundingClientRect();
@@ -417,7 +435,7 @@ document.getElementById("captureBtn").onclick = async () => {
 };
 
 /* ===========================
-      PREVIEW
+      PREVIEW RENDER
 =========================== */
 function renderImages() {
   previewEl.innerHTML = "";
