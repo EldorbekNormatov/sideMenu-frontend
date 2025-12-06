@@ -18,6 +18,11 @@
           📸 Kamerani ochish
         </button>
 
+        <button id="flashBtn"
+          class="flex-1 bg-yellow-600 p-3 rounded-full hidden active:scale-95 transition">
+          🔦 Yorug'lik
+        </button>
+
         <button id="saveBtn"
           class="flex-1 bg-blue-600 p-3 rounded-full hidden active:scale-95 transition">
           💾 Hamma rasmlarni yuborish
@@ -55,14 +60,12 @@ if (uidFromUrl) {
 }
 
 const DRIVER_UID = localStorage.getItem("driver_uid") || "";
-
-/* ===========================
-     API BASE URL
-=========================== */
 const API = "https://panel.nvmailer.uz";  
 
 let stream = null;
 let images = []; 
+let videoTrack = null;
+let torchOn = false;
 
 const statusEl = document.getElementById("status");
 const previewEl = document.getElementById("preview");
@@ -77,6 +80,32 @@ function setStatus(text, color="yellow") {
 }
 
 /* ===========================
+      FLASH ON/OFF
+=========================== */
+async function toggleTorch() {
+  if (!videoTrack) return;
+
+  const capabilities = videoTrack.getCapabilities();
+  if (!capabilities.torch) {
+    setStatus("⚠ Torch qo‘llanmaydi", "yellow");
+    return;
+  }
+
+  torchOn = !torchOn;
+
+  try {
+    await videoTrack.applyConstraints({
+      advanced: [{ torch: torchOn }]
+    });
+    document.getElementById("flashBtn").textContent =
+      torchOn ? "🔦 O‘chirish" : "🔦 Yorug'lik";
+  } catch (err) {
+    console.error(err);
+    setStatus("Torch ishlamadi", "red");
+  }
+}
+
+/* ===========================
       KAMERA OCHISH
 =========================== */
 document.getElementById("startBtn").onclick = async () => {
@@ -84,18 +113,39 @@ document.getElementById("startBtn").onclick = async () => {
     setStatus("Kamera ochilmoqda...");
 
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
+      video: {
+        facingMode: "environment",
+        focusMode: "continuous"
+      }
     });
+
+    videoTrack = stream.getVideoTracks()[0];
+    const caps = videoTrack.getCapabilities();
+
+    // Autofocus qo‘yiladi
+    if (caps.focusMode) {
+      await videoTrack.applyConstraints({
+        advanced: [{ focusMode: "continuous" }]
+      });
+    }
+
+    // Torch qo‘llasa, flash tugmasi ko‘rsatiladi
+    if (caps.torch) {
+      document.getElementById("flashBtn").classList.remove("hidden");
+    }
 
     document.getElementById("video").srcObject = stream;
     document.getElementById("camera-box").classList.remove("hidden");
 
     setStatus("Kamera tayyor. Rasmga oling.", "green");
+
   } catch (e) {
     console.error(e);
     setStatus("❌ Kamera ochilmadi", "red");
   }
 };
+
+document.getElementById("flashBtn").onclick = toggleTorch;
 
 /* ===========================
    CAPTURE → /photo-check
@@ -108,8 +158,23 @@ document.getElementById("captureBtn").onclick = async () => {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
 
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const ctx = canvas.getContext("2d");
   ctx.drawImage(video, 0, 0);
+
+  /* QORONG'U ANIQLASH → Torch yoqish */
+  const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  let sum = 0;
+
+  for (let i = 0; i < frame.data.length; i += 4) {
+    sum += frame.data[i]; // red kanal
+  }
+
+  const avg = sum / (frame.data.length / 4);
+
+  if (avg < 50 && videoTrack.getCapabilities().torch && !torchOn) {
+    toggleTorch();
+    setStatus("Qorong'u → Torch yoqildi", "yellow");
+  }
 
   setStatus("Rasm serverga yuborilyapti...");
 
@@ -119,16 +184,11 @@ document.getElementById("captureBtn").onclick = async () => {
 
   const form = new FormData();
   form.append("photo", blob, "photo.jpg");
-  form.append("uid", DRIVER_UID);   // 🔥 YUBORILADI
+  form.append("uid", DRIVER_UID);
 
   try {
-    const resp = await fetch(`${API}/photo-check`, {
-      method: "POST",
-      body: form
-    });
-
+    const resp = await fetch(`${API}/photo-check`, { method: "POST", body: form });
     const data = await resp.json();
-    console.log("photo-check:", data);
 
     if (!data.ok) {
       setStatus(data.msg || "❌ Rasm yaroqsiz", "red");
@@ -189,16 +249,11 @@ saveBtn.onclick = async () => {
     form.append("photos", img.blob, `photo_${i}.jpg`);
   });
 
-  form.append("uid", DRIVER_UID);   // 🔥 BARCHA RASMLAR BILAN YUBORILADI
+  form.append("uid", DRIVER_UID);
 
   try {
-    const resp = await fetch(`${API}/photo-save`, {
-      method: "POST",
-      body: form
-    });
-
+    const resp = await fetch(`${API}/photo-save`, { method: "POST", body: form });
     const data = await resp.json();
-    console.log("submit-documents:", data);
 
     if (data.ok) {
       setStatus("✔ Hamma rasm yuborildi!", "green");
@@ -208,6 +263,7 @@ saveBtn.onclick = async () => {
     } else {
       setStatus(data.msg || "❌ Yuborishda xatolik", "red");
     }
+
   } catch (e) {
     console.error(e);
     setStatus("❌ Server bilan aloqa yo‘q", "red");
