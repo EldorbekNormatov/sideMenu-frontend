@@ -73,7 +73,7 @@
       <div id="preview" class="space-y-2 mt-2"></div>
     </div>
 
-<script>
+<!-- <script>
 /* ===========================
    URL → UID → LOCALSTORAGE
 =========================== */
@@ -483,6 +483,272 @@ saveBtn.onclick = async () => {
     saveBtn.classList.add("hidden");
     setStatus("All photos uploaded!","green");
   } else setStatus("An error occurred","red");
+};
+</script> -->
+
+<script>
+/* ===========================
+   GLOBAL VARIABLES
+=========================== */
+let stream = null;
+let images = [];
+let videoTrack = null;
+let torchOn = false;
+
+let cvReady = false;
+let lastQuad = null;
+
+/* === AUTO-CAPTURE === */
+let prevQuad = null;
+let stableCount = 0;
+let autoCaptureCooldown = false;
+
+/* DOM refs */
+const statusEl = document.getElementById("status");
+const previewEl = document.getElementById("preview");
+const saveBtn = document.getElementById("saveBtn");
+const overlayCanvas = document.getElementById("overlay");
+const overlayCtx = overlayCanvas.getContext("2d");
+const infoOverlay = document.getElementById("infoOverlay");
+
+/* ===========================
+      STATUS
+=========================== */
+function setStatus(text, color="yellow") {
+  statusEl.textContent = text;
+  statusEl.className =
+    color === "green" ? "text-green-400 text-xs" :
+    color === "red"   ? "text-red-400 text-xs" :
+                        "text-yellow-300 text-xs";
+}
+
+function setInfo(text) {
+  infoOverlay.textContent = text || "";
+}
+
+/* ===========================
+   QUAD VALIDATION
+=========================== */
+function isValidQuad(quad) {
+  if (!quad || quad.length !== 4) return false;
+  return quad.every(p => p.x > 5 && p.y > 5);
+}
+
+/* ===========================
+   QUAD STABILITY CHECK
+=========================== */
+function isSameQuad(q1, q2) {
+  if (!q1 || !q2) return false;
+  let sum = 0;
+  for (let i = 0; i < 4; i++)
+    sum += Math.hypot(q1[i].x - q2[i].x, q1[i].y - q2[i].y);
+  return sum < 30; // iPhone-level threshold
+}
+
+/* ===========================
+   AUTO-CAPTURE FUNCTION
+=========================== */
+async function triggerAutoCapture() {
+  if (autoCaptureCooldown) return;
+  autoCaptureCooldown = true;
+
+  setInfo("📸 Capturing...");
+  overlayCanvas.style.boxShadow = "0 0 30px 10px lime";
+  setTimeout(() => overlayCanvas.style.boxShadow = "none", 400);
+
+  document.getElementById("captureBtn").click();
+
+  setTimeout(() => {
+    autoCaptureCooldown = false;
+  }, 1200); // 1.2 sec cooldown
+}
+
+/* ===========================
+   DETECTION LOOP
+=========================== */
+function startDetectionLoop() {
+  const video = document.getElementById("video");
+  const detectCanvas = document.createElement("canvas");
+  const dctx = detectCanvas.getContext("2d");
+
+  function step() {
+    if (!stream || !cvReady || !video.videoWidth) return requestAnimationFrame(step);
+
+    const w = video.videoWidth, h = video.videoHeight;
+
+    detectCanvas.width = w;
+    detectCanvas.height = h;
+    overlayCanvas.width = w;
+    overlayCanvas.height = h;
+
+    dctx.drawImage(video, 0, 0, w, h);
+
+    let src = cv.imread(detectCanvas);
+    let gray = new cv.Mat();
+    let blur = new cv.Mat();
+    let edges = new cv.Mat();
+    let contours = new cv.MatVector();
+    let hierarchy = new cv.Mat();
+
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+    cv.Canny(blur, edges, 75, 200);
+    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+
+    overlayCtx.clearRect(0, 0, w, h);
+
+    let bestArea = 0;
+    let bestQuad = null;
+
+    for (let i = 0; i < contours.size(); i++) {
+      let cnt = contours.get(i);
+      let peri = cv.arcLength(cnt, true);
+      let approx = new cv.Mat();
+      cv.approxPolyDP(cnt, approx, peri * 0.02, true);
+
+      if (approx.rows === 4) {
+        const area = cv.contourArea(approx);
+        if (area > bestArea) {
+          bestArea = area;
+          if (bestQuad) bestQuad.delete();
+          bestQuad = approx;
+        } else approx.delete();
+      } else approx.delete();
+      cnt.delete();
+    }
+
+    if (bestQuad && bestArea > w * h * 0.12) {
+      let pts = [];
+      for (let i = 0; i < 4; i++) {
+        pts.push({ x: bestQuad.intAt(i,0), y: bestQuad.intAt(i,1) });
+      }
+      lastQuad = pts;
+
+      // Draw polygon (green border)
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(pts[0].x, pts[0].y);
+      overlayCtx.lineTo(pts[1].x, pts[1].y);
+      overlayCtx.lineTo(pts[2].x, pts[2].y);
+      overlayCtx.lineTo(pts[3].x, pts[3].y);
+      overlayCtx.closePath();
+      overlayCtx.lineWidth = 4;
+      overlayCtx.strokeStyle = "lime";
+      overlayCtx.stroke();
+
+      // Stability check for auto-capture
+      if (isSameQuad(prevQuad, pts)) {
+        stableCount++;
+      } else {
+        stableCount = 0;
+      }
+      prevQuad = pts;
+
+      // If stable enough → auto capture
+      if (stableCount > 12 && !autoCaptureCooldown) {
+        triggerAutoCapture();
+      }
+
+      setInfo("📄 Document detected");
+
+    } else {
+      lastQuad = null;
+      prevQuad = null;
+      stableCount = 0;
+      setInfo("Searching document...");
+    }
+
+    // cleanup
+    src.delete(); gray.delete(); blur.delete();
+    edges.delete(); contours.delete(); hierarchy.delete();
+
+    requestAnimationFrame(step);
+  }
+
+  step();
+}
+
+/* ======================================================
+   CAPTURE BUTTON (UNCHANGED)
+====================================================== */
+document.getElementById("captureBtn").onclick = async () => {
+  const video = document.getElementById("video");
+  const base = document.createElement("canvas");
+  base.width = video.videoWidth;
+  base.height = video.videoHeight;
+  base.getContext("2d").drawImage(video, 0, 0);
+
+  let finalCanvas = base;
+
+  if (cvReady && lastQuad) {
+    const pts = lastQuad;
+    const w1 = Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+    const w2 = Math.hypot(pts[2].x-pts[3].x, pts[2].y-pts[3].y);
+    const h1 = Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y);
+    const h2 = Math.hypot(pts[2].x-pts[1].x, pts[2].y-pts[1].y);
+
+    const dstW = Math.max(w1, w2);
+    const dstH = Math.max(h1, h2);
+
+    const src = cv.imread(base);
+    const dst = new cv.Mat();
+    const srcTri = cv.matFromArray(4,1,cv.CV_32FC2,[pts[0].x,pts[0].y, pts[1].x,pts[1].y, pts[2].x,pts[2].y, pts[3].x,pts[3].y]);
+    const dstTri = cv.matFromArray(4,1,cv.CV_32FC2,[0,0, dstW,0, dstW,dstH, 0,dstH]);
+
+    const M = cv.getPerspectiveTransform(srcTri, dstTri);
+    cv.warpPerspective(src, dst, M, new cv.Size(dstW, dstH));
+
+    finalCanvas = document.createElement("canvas");
+    finalCanvas.width = dstW;
+    finalCanvas.height = dstH;
+    cv.imshow(finalCanvas, dst);
+
+    src.delete(); dst.delete(); srcTri.delete(); dstTri.delete(); M.delete();
+  }
+
+  const blob = await new Promise(res => finalCanvas.toBlob(res, "image/jpeg", 0.95));
+  const url = URL.createObjectURL(blob);
+
+  images.push({ blob, url });
+  renderImages();
+  saveBtn.classList.remove("hidden");
+  setStatus("Auto photo captured!", "green");
+};
+
+/* ======================================================
+   PREVIEW & SAVE (unchanged)
+====================================================== */
+function renderImages() {
+  previewEl.innerHTML = "";
+  images.forEach((img, i) => {
+    previewEl.innerHTML += `
+      <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
+        <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover" />
+        <button data-i="${i}" class="ml-auto px-2 py-1 bg-red-600 rounded-full text-xs">🗑 Delete</button>
+      </div>`;
+  });
+
+  document.querySelectorAll("button[data-i]").forEach(btn => {
+    btn.onclick = () => {
+      images.splice(btn.dataset.i, 1);
+      renderImages();
+      if (!images.length) saveBtn.classList.add("hidden");
+    };
+  });
+}
+
+/* ======================================================
+   START CAMERA
+====================================================== */
+document.getElementById("startBtn").onclick = async () => {
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+  });
+
+  videoTrack = stream.getVideoTracks()[0];
+
+  document.getElementById("video").srcObject = stream;
+  document.getElementById("camera-box").classList.remove("hidden");
+  startDetectionLoop();
 };
 </script>
 
