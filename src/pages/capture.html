@@ -44,14 +44,25 @@
 
 <script>
 /* ===========================
+   URL → UID → LOCALSTORAGE
+=========================== */
+const params = new URLSearchParams(window.location.search);
+const uidFromUrl = params.get("uid");
+
+if (uidFromUrl) {
+  localStorage.setItem("driver_uid", uidFromUrl);
+  console.log("UID saqlandi:", uidFromUrl);
+}
+
+const DRIVER_UID = localStorage.getItem("driver_uid") || "";
+
+/* ===========================
      API BASE URL
 =========================== */
 const API = "https://panel.nvmailer.uz";  
-// Agar HTTPS bo‘lmasa:
-// const API = "http://panel.nvmailer.uz";  
 
 let stream = null;
-let images = [];  // backend tasdiqlagan rasmlar
+let images = []; 
 
 const statusEl = document.getElementById("status");
 const previewEl = document.getElementById("preview");
@@ -87,7 +98,7 @@ document.getElementById("startBtn").onclick = async () => {
 };
 
 /* ===========================
-   CAPTURE → BACKEND /photo-check
+   CAPTURE → /photo-check
 =========================== */
 document.getElementById("captureBtn").onclick = async () => {
   const video = document.getElementById("video");
@@ -108,6 +119,7 @@ document.getElementById("captureBtn").onclick = async () => {
 
   const form = new FormData();
   form.append("photo", blob, "photo.jpg");
+  form.append("uid", DRIVER_UID);   // 🔥 YUBORILADI
 
   try {
     const resp = await fetch(`${API}/photo-check`, {
@@ -123,7 +135,6 @@ document.getElementById("captureBtn").onclick = async () => {
       return;
     }
 
-    // backend tasdiqladi → ro‘yxatga qo‘shamiz
     const url = URL.createObjectURL(blob);
     images.push({ blob, url });
 
@@ -165,7 +176,7 @@ function renderImages() {
 }
 
 /* ===========================
-   ALL PHOTOS → /submit-documents
+   ALL PHOTOS → /photo-save
 =========================== */
 saveBtn.onclick = async () => {
   if (images.length === 0)
@@ -177,6 +188,8 @@ saveBtn.onclick = async () => {
   images.forEach((img, i) => {
     form.append("photos", img.blob, `photo_${i}.jpg`);
   });
+
+  form.append("uid", DRIVER_UID);   // 🔥 BARCHA RASMLAR BILAN YUBORILADI
 
   try {
     const resp = await fetch(`${API}/photo-save`, {
