@@ -1,82 +1,80 @@
 <!DOCTYPE html>
-<html lang="uz">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fast Capture</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- OpenCV.js AI uchun -->
-    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-  </head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fast Capture</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+</head>
 
-  <body class="bg-slate-900 text-white min-h-screen">
-    <div class="max-w-md mx-auto p-4">
-      <h2 class="text-xl font-bold mb-4">Hujjatni rasmga olish</h2>
+<body class="bg-slate-900 text-white min-h-screen">
+  <div class="max-w-md mx-auto p-4">
 
-      <!-- START + SAVE BUTTONS -->
-      <div class="flex gap-3 mb-3">
-        <button id="startBtn"
-          class="flex-1 bg-slate-700 p-3 rounded-full active:scale-95 transition">
-          📸 Kamerani ochish
-        </button>
+    <h2 class="text-xl font-bold mb-4">Document Capture</h2>
 
-        <button id="saveBtn"
-          class="flex-1 bg-blue-600 p-3 rounded-full hidden active:scale-95 transition">
-          💾 Hamma rasmlarni yuborish
-        </button>
-      </div>
+    <!-- START + SAVE BUTTONS -->
+    <div class="flex gap-3 mb-3">
+      <button id="startBtn"
+        class="flex-1 bg-slate-700 p-3 rounded-full active:scale-95 transition">
+        📸 Open Camera
+      </button>
 
-      <p id="status" class="text-xs min-h-[20px] text-yellow-300"></p>
-
-      <!-- CAMERA BOX -->
-      <div id="camera-box" class="hidden mt-4 relative">
-
-        <!-- FLASH STATUS OVERLAY -->
-        <div id="flashOnScreen"
-          class="absolute top-3 right-3 bg-yellow-500 px-3 py-1 rounded-full text-xs hidden z-20">
-          🔦 Flash
-        </div>
-
-        <!-- AI / STATUS OVERLAY -->
-        <div id="infoOverlay"
-          class="absolute left-1/2 -translate-x-1/2 bottom-3 bg-slate-900/70 px-3 py-1 rounded-full text-xs z-20">
-        </div>
-
-        <!-- VIDEO STREAM -->
-        <video id="video" autoplay playsinline
-          class="w-full rounded-xl bg-black aspect-[3/4] object-cover relative z-0"></video>
-
-        <!-- AI BOUNDING BOX -->
-        <canvas id="overlay"
-          class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
-
-        <!-- ⭐ FOCUS RING (NEW) -->
-        <div id="focusRing"
-          class="absolute w-20 h-20 rounded-full border-4 border-yellow-300 hidden z-30 transition-all duration-300"
-          style="pointer-events:none;"></div>
-
-        <!-- FLASH BUTTON -->
-        <button id="flashBtn"
-          class="absolute bottom-20 right-3 bg-yellow-600 p-2 rounded-full hidden active:scale-95 transition text-sm z-20">
-          🔦
-        </button>
-
-        <!-- CAPTURE BUTTON -->
-        <button id="captureBtn"
-          class="w-full mt-3 bg-emerald-500 p-3 rounded-full active:scale-95 transition relative z-20">
-          📷 Rasmni olish
-        </button>
-      </div>
-
-      <!-- PREVIEW -->
-      <h3 class="mt-6 font-bold text-sm">Qabul qilingan rasmlar</h3>
-      <div id="preview" class="space-y-2 mt-2"></div>
+      <button id="saveBtn"
+        class="flex-1 bg-blue-600 p-3 rounded-full hidden active:scale-95 transition">
+        💾 Upload All
+      </button>
     </div>
 
+    <p id="status" class="text-xs min-h-[20px] text-yellow-300"></p>
+
+    <!-- CAMERA BOX -->
+    <div id="camera-box" class="hidden mt-4 relative">
+
+      <!-- FLASH STATUS -->
+      <div id="flashOnScreen"
+        class="absolute top-3 right-3 bg-yellow-500 px-3 py-1 rounded-full text-xs hidden z-20">
+        🔦 Flash
+      </div>
+
+      <!-- MAIN OVERLAY (ALL MESSAGES APPEAR HERE) -->
+      <div id="infoOverlay"
+        class="absolute left-1/2 -translate-x-1/2 bottom-3 bg-black/70 px-3 py-1 rounded-full text-xs z-20">
+      </div>
+
+      <!-- VIDEO -->
+      <video id="video" autoplay playsinline
+        class="w-full rounded-xl bg-black aspect-[3/4] object-cover relative z-0"></video>
+
+      <!-- AI RECTANGLE -->
+      <canvas id="overlay"
+        class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
+
+      <!-- FOCUS RING -->
+      <div id="focusRing"
+        class="absolute w-20 h-20 rounded-full border-4 border-yellow-300 hidden z-30 transition-all duration-300"
+        style="pointer-events:none;"></div>
+
+      <!-- FLASH BUTTON -->
+      <button id="flashBtn"
+        class="absolute bottom-20 right-3 bg-yellow-600 p-2 rounded-full hidden active:scale-95 transition text-sm z-20">
+        🔦
+      </button>
+
+      <!-- CAPTURE BUTTON -->
+      <button id="captureBtn"
+        class="w-full mt-3 bg-emerald-500 p-3 rounded-full active:scale-95 transition relative z-20">
+        📷 Capture
+      </button>
+    </div>
+
+    <!-- PREVIEW -->
+    <h3 class="mt-6 font-bold text-sm">Captured Images</h3>
+    <div id="preview" class="space-y-2 mt-2"></div>
+  </div>
+
 <script>
-/* ===========================
-   URL → UID → LOCALSTORAGE
-=========================== */
+/* URL → UID */
 const params = new URLSearchParams(window.location.search);
 const uidFromUrl = params.get("uid");
 if (uidFromUrl) localStorage.setItem("driver_uid", uidFromUrl);
@@ -84,146 +82,126 @@ if (uidFromUrl) localStorage.setItem("driver_uid", uidFromUrl);
 const DRIVER_UID = localStorage.getItem("driver_uid") || "";
 const API = "https://panel.nvmailer.uz";
 
-/* =========================== */
 let stream = null;
 let images = [];
 let videoTrack = null;
 let torchOn = false;
-
 let cvReady = false;
 let lastQuad = null;
-let lastCenter = null;
-let isShaky = false;
 
-/* =========================== DOM refs */
-const statusEl = document.getElementById("status");
+/* DOM refs */
 const previewEl = document.getElementById("preview");
-const saveBtn = document.getElementById("saveBtn");
 const overlayCanvas = document.getElementById("overlay");
 const overlayCtx = overlayCanvas.getContext("2d");
 const infoOverlay = document.getElementById("infoOverlay");
 const focusRing = document.getElementById("focusRing");
+const saveBtn = document.getElementById("saveBtn");
 
-/* ===========================
-      OpenCV load
-=========================== */
-(function waitForCV() {
-  const check = setInterval(() => {
-    if (window.cv && cv.Mat) {
-      cv.onRuntimeInitialized = () => (cvReady = true);
-      clearInterval(check);
+/* ALL MESSAGES ON CAMERA */
+function showMessage(msg, color = "yellow") {
+  infoOverlay.textContent = msg;
+
+  infoOverlay.className =
+    "absolute left-1/2 -translate-x-1/2 bottom-3 px-3 py-1 rounded-full text-xs z-20 text-white " +
+    (color === "green"
+      ? "bg-green-600/80"
+      : color === "red"
+      ? "bg-red-600/80"
+      : "bg-yellow-500/80");
+}
+
+function setStatus(msg, color="yellow"){ showMessage(msg,color); }
+function setInfo(msg){ showMessage(msg,"yellow"); }
+
+/* Load OpenCV */
+(function waitForCV(){
+  const x = setInterval(()=>{
+    if(window.cv && cv.Mat){
+      cv.onRuntimeInitialized = ()=> cvReady=true;
+      clearInterval(x);
     }
-  }, 100);
+  },50);
 })();
 
-function setStatus(text, color="yellow") {
-  statusEl.textContent = text;
-  statusEl.className =
-    color === "green" ? "text-green-400 text-xs" :
-    color === "red"   ? "text-red-400 text-xs" :
-                        "text-yellow-300 text-xs";
-}
-
-function setInfo(text) {
-  infoOverlay.textContent = text || "";
-}
-
-/* ===========================
-      FLASH ON/OFF
-=========================== */
-async function toggleTorch() {
-  if (!videoTrack) return;
+/* FLASH */
+async function toggleTorch(){
+  if(!videoTrack) return;
   const caps = videoTrack.getCapabilities?.();
-  if (!caps?.torch) return;
-
+  if(!caps?.torch) return;
   torchOn = !torchOn;
-
-  try {
-    await videoTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
-  } catch {}
+  await videoTrack.applyConstraints({advanced:[{torch:torchOn}]});
+  showMessage(torchOn ? "Flash enabled" : "Flash disabled", "yellow");
 }
 
-/* ===========================
-    FLASH BURST (1 sec)
-=========================== */
-async function flashBurst() {
-  if (!videoTrack) return;
+async function flashBurst(){
+  if(!videoTrack) return;
   const caps = videoTrack.getCapabilities?.();
-  if (!caps?.torch) return;
-
-  await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
-  await new Promise((res) => setTimeout(res, 600));
-  await videoTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+  if(!caps?.torch) return;
+  await videoTrack.applyConstraints({advanced:[{torch:true}]});
+  await new Promise(r=>setTimeout(r,600));
+  await videoTrack.applyConstraints({advanced:[{torch:torchOn}]});
 }
 
-/* ===========================
-   AI doc ordering
-=========================== */
-function orderQuad(pts) {
-  const sum  = pts.map(p => p.x + p.y);
-  const diff = pts.map(p => p.y - p.x);
-
+/* AI CORNER ORDER */
+function orderQuad(pts){
+  const sum = pts.map(p=>p.x+p.y);
+  const diff = pts.map(p=>p.y-p.x);
   return [
-    pts[sum.indexOf(Math.min(...sum))], // tl
-    pts[diff.indexOf(Math.min(...diff))], // tr
-    pts[sum.indexOf(Math.max(...sum))], // br
-    pts[diff.indexOf(Math.max(...diff))] // bl
+    pts[sum.indexOf(Math.min(...sum))],
+    pts[diff.indexOf(Math.min(...diff))],
+    pts[sum.indexOf(Math.max(...sum))],
+    pts[diff.indexOf(Math.max(...diff))]
   ];
 }
 
-/* ===========================
-      AI DETECTION LOOP
-=========================== */
-function startDetectionLoop() {
+/* DETECTION LOOP */
+function startDetectionLoop(){
   const video = document.getElementById("video");
   const detectCanvas = document.createElement("canvas");
   const dctx = detectCanvas.getContext("2d");
 
-  function step() {
-    if (!stream) return;
-
-    if (!cvReady || !video.videoWidth) {
+  function step(){
+    if(!stream || !cvReady || !video.videoWidth){
       requestAnimationFrame(step);
       return;
     }
 
-    const w = video.videoWidth, h = video.videoHeight;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
 
     detectCanvas.width = w;
     detectCanvas.height = h;
     overlayCanvas.width = w;
     overlayCanvas.height = h;
 
-    dctx.drawImage(video, 0, 0, w, h);
+    dctx.drawImage(video,0,0,w,h);
 
-    let src = cv.imread(detectCanvas);
-    let gray = new cv.Mat();
-    let blur = new cv.Mat();
-    let edges = new cv.Mat();
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
+    let src=cv.imread(detectCanvas);
+    let gray=new cv.Mat(); let blur=new cv.Mat();
+    let edges=new cv.Mat(); let contours=new cv.MatVector();
+    let hierarchy=new cv.Mat();
 
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
-    cv.Canny(blur, edges, 75, 200);
+    cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
+    cv.GaussianBlur(gray,blur,new cv.Size(5,5),0);
+    cv.Canny(blur,edges,70,160);
 
-    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+    cv.findContours(edges,contours,hierarchy,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE);
 
     overlayCtx.clearRect(0,0,w,h);
 
-    let bestArea = 0, bestQuad = null;
+    let bestQuad=null, bestArea=0;
 
-    for (let i=0;i<contours.size();i++) {
+    for(let i=0;i<contours.size();i++){
       let cnt = contours.get(i);
-      let peri = cv.arcLength(cnt, true);
+      let peri = cv.arcLength(cnt,true);
       let approx = new cv.Mat();
-      cv.approxPolyDP(cnt, approx, peri*0.02, true);
+      cv.approxPolyDP(cnt,approx,peri*0.02,true);
 
-      if (approx.rows === 4) {
+      if(approx.rows===4){
         let area = cv.contourArea(approx);
-        if (area > bestArea) {
+        if(area>bestArea){
           bestArea = area;
-          if (bestQuad) bestQuad.delete();
+          if(bestQuad) bestQuad.delete();
           bestQuad = approx;
         } else approx.delete();
       } else approx.delete();
@@ -231,206 +209,184 @@ function startDetectionLoop() {
       cnt.delete();
     }
 
-    if (bestQuad && bestArea > w*h*0.12) {
-      let pts = [];
-      for (let i=0;i<4;i++)
-        pts.push({ x: bestQuad.intAt(i,0), y: bestQuad.intAt(i,1) });
-
+    if(bestQuad && bestArea > w*h*0.15){
+      let pts=[];
+      for(let i=0;i<4;i++)
+        pts.push({x:bestQuad.intAt(i,0),y:bestQuad.intAt(i,1)});
       lastQuad = orderQuad(pts);
 
       overlayCtx.beginPath();
-      overlayCtx.moveTo(lastQuad[0].x,lastQuad[0].y);
-      overlayCtx.lineTo(lastQuad[1].x,lastQuad[1].y);
-      overlayCtx.lineTo(lastQuad[2].x,lastQuad[2].y);
-      overlayCtx.lineTo(lastQuad[3].x,lastQuad[3].y);
+      overlayCtx.moveTo(pts[0].x,pts[0].y);
+      overlayCtx.lineTo(pts[1].x,pts[1].y);
+      overlayCtx.lineTo(pts[2].x,pts[2].y);
+      overlayCtx.lineTo(pts[3].x,pts[3].y);
       overlayCtx.closePath();
-      overlayCtx.lineWidth = 3;
-      overlayCtx.strokeStyle = "lime";
+      overlayCtx.lineWidth=3;
+      overlayCtx.strokeStyle="lime";
       overlayCtx.stroke();
 
-      setInfo("📄 Hujjat aniqlandi");
+      showMessage("Document detected","green");
     } else {
-      lastQuad = null;
-      setInfo("Hujjatni to‘liq ko‘rsating");
+      lastQuad=null;
+      showMessage("Please position the document properly","yellow");
     }
 
-    src.delete(); gray.delete(); blur.delete();
-    edges.delete(); contours.delete(); hierarchy.delete();
+    src.delete(); gray.delete(); blur.delete(); edges.delete();
+    contours.delete(); hierarchy.delete();
 
     requestAnimationFrame(step);
   }
-
   step();
 }
 
-/* ===========================
-      KAMERA OCHISH
-=========================== */
-document.getElementById("startBtn").onclick = async () => {
-  try {
-    setStatus("Kamera ochilmoqda...");
+/* OPEN CAMERA */
+document.getElementById("startBtn").onclick = async()=>{
+  try{
+    showMessage("Opening camera...");
 
     stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        focusMode: "continuous",
-        frameRate: { ideal: 30 }
+      video:{
+        facingMode:{ideal:"environment"},
+        width:{ideal:1920},
+        height:{ideal:1080},
+        focusMode:"continuous",
+        frameRate:{ideal:30}
       }
     });
 
     videoTrack = stream.getVideoTracks()[0];
 
     const caps = videoTrack.getCapabilities?.();
-    if (caps?.torch) document.getElementById("flashBtn").classList.remove("hidden");
+    if(caps?.torch) document.getElementById("flashBtn").classList.remove("hidden");
 
     document.getElementById("video").srcObject = stream;
     document.getElementById("camera-box").classList.remove("hidden");
 
-    setStatus("Kamera tayyor!", "green");
+    showMessage("Camera ready","green");
     startDetectionLoop();
-  } catch (err) {
-    console.log(err);
-    setStatus("❌ Kamera ochilmadi", "red");
+
+  }catch{
+    showMessage("Camera error","red");
   }
 };
 
-/* ===========================
-      ⭐ TAP-TO-FOCUS (NEW)
-=========================== */
-document.getElementById("video").addEventListener("click", async (e) => {
-  if (!videoTrack) return;
+/* TAP TO FOCUS */
+document.getElementById("video").addEventListener("click", async(e)=>{
+  if(!videoTrack) return;
 
-  const caps = videoTrack.getCapabilities?.();
-  if (!caps?.focusMode) return;
+  const caps=btoa;
+  const video=document.getElementById("video");
+  const rect=video.getBoundingClientRect();
 
-  const video = document.getElementById("video");
-  const rect = video.getBoundingClientRect();
+  const x=(e.clientX-rect.left)/rect.width;
+  const y=(e.clientY-rect.top)/rect.height;
 
-  const x = (e.clientX - rect.left) / rect.width;
-  const y = (e.clientY - rect.top) / rect.height;
-
-  // SHOW FOCUS RING
-  focusRing.style.left = (e.clientX - rect.left - 40) + "px";
-  focusRing.style.top = (e.clientY - rect.top - 40) + "px";
+  focusRing.style.left=(e.clientX-rect.left-40)+"px";
+  focusRing.style.top=(e.clientY-rect.top-40)+"px";
   focusRing.classList.remove("hidden");
-  setTimeout(() => focusRing.classList.add("hidden"), 600);
+  setTimeout(()=>focusRing.classList.add("hidden"),500);
 
-  try {
+  try{
     await videoTrack.applyConstraints({
-      advanced: [
-        {
-          focusMode: "continuous",
-          pointsOfInterest: [{ x, y }]
-        }
-      ]
+      advanced:[{focusMode:"continuous",pointsOfInterest:[{x,y}]}]
     });
-
-    setInfo("🎯 Fokus aniqlandi");
-  } catch (err) {
-    console.warn("Tap-to-focus qo‘llanmaydi:", err);
-  }
+    showMessage("Focusing...","yellow");
+  }catch{}
 });
 
-/* ===========================
-   CAPTURE + AUTO CROP
-=========================== */
-document.getElementById("captureBtn").onclick = async () => {
-  const video = document.getElementById("video");
-  if (!video.videoWidth) return;
+/* CAPTURE */
+document.getElementById("captureBtn").onclick = async()=>{
+  const video=document.getElementById("video");
+  if(!video.videoWidth) return;
 
   await flashBurst();
+  showMessage("Capturing...","yellow");
 
-  const base = document.createElement("canvas");
-  base.width = video.videoWidth;
-  base.height = video.videoHeight;
-  base.getContext("2d").drawImage(video, 0, 0);
+  const base=document.createElement("canvas");
+  base.width=video.videoWidth;
+  base.height=video.videoHeight;
+  base.getContext("2d").drawImage(video,0,0);
 
-  let finalCanvas = base;
+  let finalCanvas=base;
 
-  if (cvReady && lastQuad) {
-    try {
-      const pts = lastQuad;
-      const w1 = Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
-      const w2 = Math.hypot(pts[2].x-pts[3].x, pts[2].y-pts[3].y);
-      const h1 = Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y);
-      const h2 = Math.hypot(pts[2].x-pts[1].x, pts[2].y-pts[1].y);
+  if(cvReady && lastQuad){
+    try{
+      const pts=lastQuad;
 
-      const dstW = Math.max(w1, w2);
-      const dstH = Math.max(h1, h2);
+      const w1=Math.hypot(pts[1].x-pts[0].x,pts[1].y-pts[0].y);
+      const w2=Math.hypot(pts[2].x-pts[3].x,pts[2].y-pts[3].y);
+      const h1=Math.hypot(pts[3].x-pts[0].x,pts[3].y-pts[0].y);
+      const h2=Math.hypot(pts[2].x-pts[1].x,pts[2].y-pts[1].y);
 
-      const src = cv.imread(base);
-      const dst = new cv.Mat();
+      const dstW=Math.max(w1,w2);
+      const dstH=Math.max(h1,h2);
 
-      const srcTri = cv.matFromArray(4,1,cv.CV_32FC2,[
+      const src=cv.imread(base);
+      const dst=new cv.Mat();
+
+      const srcTri=cv.matFromArray(4,1,cv.CV_32FC2,[
         pts[0].x,pts[0].y,
         pts[1].x,pts[1].y,
         pts[2].x,pts[2].y,
         pts[3].x,pts[3].y
       ]);
 
-      const dstTri = cv.matFromArray(4,1,cv.CV_32FC2,[
+      const dstTri=cv.matFromArray(4,1,cv.CV_32FC2,[
         0,0,
         dstW,0,
         dstW,dstH,
         0,dstH
       ]);
 
-      const M = cv.getPerspectiveTransform(srcTri,dstTri);
-
+      const M=cv.getPerspectiveTransform(srcTri,dstTri);
       cv.warpPerspective(src,dst,M,new cv.Size(dstW,dstH));
 
-      finalCanvas = document.createElement("canvas");
-      finalCanvas.width = dstW;
-      finalCanvas.height = dstH;
-
-      cv.imshow(finalCanvas, dst);
+      finalCanvas=document.createElement("canvas");
+      finalCanvas.width=dstW;
+      finalCanvas.height=dstH;
+      cv.imshow(finalCanvas,dst);
 
       src.delete(); dst.delete(); srcTri.delete(); dstTri.delete(); M.delete();
-    } catch (err) { console.log(err); }
+
+      showMessage("Document corrected","green");
+    }catch{
+      showMessage("Cropping failed","red");
+    }
   }
 
-  const blob = await new Promise(res =>
-    finalCanvas.toBlob(res, "image/jpeg", 0.95)
-  );
+  const blob=await new Promise(res=>finalCanvas.toBlob(res,"image/jpeg",0.95));
 
-  const form = new FormData();
-  form.append("photo", blob);
-  form.append("uid", DRIVER_UID);
+  const form=new FormData();
+  form.append("photo",blob);
+  form.append("uid",DRIVER_UID);
 
-  const resp = await fetch(`${API}/photo-check`, {
-    method: "POST",
-    body: form
-  });
+  const resp=await fetch(`${API}/photo-check`,{method:"POST",body:form});
+  const data=await resp.json();
 
-  const data = await resp.json();
-  if (!data.ok) {
-    setStatus(data.msg, "red");
+  if(!data.ok){
+    showMessage(data.msg,"red");
     return;
   }
 
-  const url = URL.createObjectURL(blob);
-  images.push({ blob, url });
+  const url=URL.createObjectURL(blob);
+  images.push({blob,url});
   renderImages();
   saveBtn.classList.remove("hidden");
-  setStatus("Rasm qabul qilindi!", "green");
+
+  showMessage("Image accepted","green");
 };
 
-/* ===========================
-      PREVIEW
-=========================== */
-function renderImages() {
-  previewEl.innerHTML = "";
-  images.forEach((img, i) => {
-    previewEl.innerHTML += `
+/* PREVIEW */
+function renderImages(){
+  previewEl.innerHTML="";
+
+  images.forEach((img,i)=>{
+    previewEl.innerHTML+=`
       <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
         <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover" />
-        <button data-i="${i}"
-          class="ml-auto px-2 py-1 bg-red-600 rounded-full text-xs">
-          🗑 O'chirish
-        </button>
-      </div>`;
+        <button data-i="${i}" class="ml-auto px-2 py-1 bg-red-600 rounded-full text-xs">🗑 Delete</button>
+      </div>
+    `;
   });
 
   document.querySelectorAll("button[data-i]").forEach(btn=>{
@@ -442,30 +398,29 @@ function renderImages() {
   });
 }
 
-/* ===========================
-   SAVE ALL
-=========================== */
-saveBtn.onclick = async () => {
+/* SAVE ALL */
+saveBtn.onclick = async()=>{
   if(images.length===0) return;
 
-  const form = new FormData();
+  showMessage("Uploading...","yellow");
+
+  const form=new FormData();
   images.forEach((img,i)=>{
     form.append("photos",img.blob,`photo_${i}.jpg`);
   });
   form.append("uid",DRIVER_UID);
 
-  const resp = await fetch(`${API}/photo-save`,{
-    method:"POST",
-    body:form
-  });
+  const resp=await fetch(`${API}/photo-save`,{method:"POST",body:form});
+  const data=await resp.json();
 
-  const data = await resp.json();
   if(data.ok){
-    images = [];
+    showMessage("Upload completed","green");
+    images=[];
     renderImages();
     saveBtn.classList.add("hidden");
-    setStatus("Hamma rasm yuborildi!","green");
-  } else setStatus("Xatolik yuz berdi","red");
+  } else {
+    showMessage("Upload failed","red");
+  }
 };
 </script>
 
