@@ -5,146 +5,171 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fast Capture</title>
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- OpenCV.js -->
+    <!-- OpenCV.js for AI -->
     <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-
-    <!-- CLICK SOUND -->
-    <audio id="clickSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
-
-    <style>
-      /* BORDER PULSE ANIMATION */
-      @keyframes pulseGreen {
-        0%   { box-shadow: 0 0 0px 0px rgba(0,255,0,0.7); }
-        50%  { box-shadow: 0 0 30px 10px rgba(0,255,0,1); }
-        100% { box-shadow: 0 0 0px 0px rgba(0,255,0,0.7); }
-      }
-      .pulse-green {
-        animation: pulseGreen 0.6s ease-out;
-      }
-    </style>
   </head>
 
-<body class="bg-slate-900 text-white min-h-screen">
+  <body class="bg-slate-900 text-white min-h-screen">
     <div class="max-w-md mx-auto p-4">
       <h2 class="text-xl font-bold mb-4">Take Document Photo</h2>
 
+      <!-- START + SAVE BUTTONS -->
       <div class="flex gap-3 mb-3">
         <button id="startBtn"
-          class="flex-1 bg-slate-700 p-3 rounded-full">
+          class="flex-1 bg-slate-700 p-3 rounded-full active:scale-95 transition">
           📸 Open Camera
         </button>
 
         <button id="saveBtn"
-          class="flex-1 bg-blue-600 p-3 rounded-full hidden">
+          class="flex-1 bg-blue-600 p-3 rounded-full hidden active:scale-95 transition">
           💾 Upload All Photos
         </button>
       </div>
 
       <p id="status" class="text-xs min-h-[20px] text-yellow-300"></p>
 
+      <!-- CAMERA BOX -->
       <div id="camera-box" class="hidden mt-4 relative">
 
+        <!-- FLASH STATUS OVERLAY -->
+        <div id="flashOnScreen"
+          class="absolute top-3 right-3 bg-yellow-500 px-3 py-1 rounded-full text-xs hidden z-20">
+          🔦 Flash
+        </div>
+
+        <!-- AI / STATUS OVERLAY -->
         <div id="infoOverlay"
-          class="absolute left-1/2 -translate-x-1/2 bottom-3 bg-slate-900/70 px-3 py-1 
-          rounded-full text-xs z-20"></div>
+          class="absolute left-1/2 -translate-x-1/2 bottom-3 bg-slate-900/70 px-3 py-1 rounded-full text-xs z-20">
+        </div>
 
+        <!-- VIDEO STREAM -->
         <video id="video" autoplay playsinline
-          class="w-full rounded-xl bg-black aspect-[3/4] object-cover"></video>
+          class="w-full rounded-xl bg-black aspect-[3/4] object-cover relative z-0"></video>
 
+        <!-- AI BOUNDING BOX -->
         <canvas id="overlay"
           class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
 
+        <!-- ⭐ FOCUS RING (NEW) -->
+        <div id="focusRing"
+          class="absolute w-20 h-20 rounded-full border-4 border-yellow-300 hidden z-30 transition-all duration-300"
+          style="pointer-events:none;"></div>
+
+        <!-- FLASH BUTTON -->
+        <button id="flashBtn"
+          class="absolute bottom-20 right-3 bg-yellow-600 p-2 rounded-full hidden active:scale-95 transition text-sm z-20">
+          🔦
+        </button>
+
+        <!-- CAPTURE BUTTON -->
         <button id="captureBtn"
-          class="w-full mt-3 bg-emerald-500 p-3 rounded-full hidden">
+          class="w-full mt-3 bg-emerald-500 p-3 rounded-full active:scale-95 transition relative z-20">
           📷 Capture Photo
         </button>
       </div>
 
+      <!-- PREVIEW -->
       <h3 class="mt-6 font-bold text-sm">Received Photos</h3>
       <div id="preview" class="space-y-2 mt-2"></div>
     </div>
 
 <script>
-/* =========================== GLOBAL VARIABLES =========================== */
+/* ==========================
+      GLOBAL VARIABLES
+========================== */
 let stream = null;
-let videoTrack = null;
 let images = [];
-let torchOn = false;
-
+let videoTrack = null;
 let cvReady = false;
 let lastQuad = null;
 
-/* AUTO CAPTURE */
 let prevQuad = null;
 let stableCount = 0;
-let captureCooldown = false;
+let autoCooldown = false;
 
-/* DOM */
-const clickSound = document.getElementById("clickSound");
+/* ==========================
+      DOM
+========================== */
+const previewEl = document.getElementById("preview");
+const saveBtn = document.getElementById("saveBtn");
 const overlayCanvas = document.getElementById("overlay");
 const overlayCtx = overlayCanvas.getContext("2d");
 const infoOverlay = document.getElementById("infoOverlay");
-const saveBtn = document.getElementById("saveBtn");
-const previewEl = document.getElementById("preview");
+const statusEl = document.getElementById("status");
 
-/* ================= OPEN CV LOAD ================= */
-(function waitForCV() {
-  const chk = setInterval(() => {
-    if (window.cv && cv.Mat) {
-      cv.onRuntimeInitialized = () => cvReady = true;
-      clearInterval(chk);
+function setInfo(t){ infoOverlay.textContent = t }
+function setStatus(t){ statusEl.textContent = t }
+
+/* ==========================
+      HIGH RES CAMERA
+========================== */
+document.getElementById("startBtn").onclick = async () => {
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: "environment",
+      width: { ideal: 4096 },   // 4K+
+      height: { ideal: 2160 }   // 4K+
     }
-  }, 100);
-})();
+  });
 
-/* ================= STATUS TEXT ================= */
-function setInfo(text) { infoOverlay.textContent = text; }
+  videoTrack = stream.getVideoTracks()[0];
+  document.getElementById("video").srcObject = stream;
+  document.getElementById("camera-box").classList.remove("hidden");
 
-/* ================= QUAD CHECK ================= */
+  startDetectionLoop();
+};
+
+/* ==========================
+      QUAD STABILITY
+========================== */
 function isSameQuad(q1, q2) {
   if (!q1 || !q2) return false;
-  let diff = 0;
+  let d = 0;
   for (let i = 0; i < 4; i++)
-    diff += Math.hypot(q1[i].x - q2[i].x, q1[i].y - q2[i].y);
-  return diff < 30;
+    d += Math.hypot(q1[i].x - q2[i].x, q1[i].y - q2[i].y);
+  return d < 35;
 }
 
-/* ================= AUTO CAPTURE ================= */
-async function triggerAutoCapture() {
-  if (captureCooldown) return;
-  captureCooldown = true;
+/* ==========================
+      AUTO CAPTURE
+========================== */
+async function autoCapture() {
+  if (autoCooldown) return;
+  autoCooldown = true;
 
-  clickSound.play();               // 🔊 CLICK SOUND
-  overlayCanvas.classList.add("pulse-green"); // 🌈 ANIMATION
+  overlayCanvas.style.boxShadow = "0 0 35px 10px lime";
+
+  setTimeout(() => {
+    overlayCanvas.style.boxShadow = "none";
+  }, 500);
 
   document.getElementById("captureBtn").click();
 
-  setTimeout(() => {
-    captureCooldown = false;
-    overlayCanvas.classList.remove("pulse-green");
-  }, 1000);
+  setTimeout(() => autoCooldown = false, 1200);
 }
 
-/* ================= DETECTION LOOP ================= */
+/* ==========================
+      SUPER DETECTION LOOP
+========================== */
 function startDetectionLoop() {
   const video = document.getElementById("video");
-  const tmp = document.createElement("canvas");
-  const tmpCtx = tmp.getContext("2d");
+  const temp = document.createElement("canvas");
+  const ctx = temp.getContext("2d");
 
   function step() {
-    if (!cvReady || !video.videoWidth) return requestAnimationFrame(step);
+    if (!stream || !video.videoWidth) return requestAnimationFrame(step);
 
     const w = video.videoWidth;
     const h = video.videoHeight;
-    tmp.width = w;
-    tmp.height = h;
+
+    temp.width = w;
+    temp.height = h;
     overlayCanvas.width = w;
     overlayCanvas.height = h;
 
-    tmpCtx.drawImage(video, 0, 0, w, h);
+    ctx.drawImage(video, 0, 0, w, h);
 
-    let src = cv.imread(tmp);
+    let src = cv.imread(temp);
     let gray = new cv.Mat();
     let blur = new cv.Mat();
     let edges = new cv.Mat();
@@ -153,10 +178,11 @@ function startDetectionLoop() {
 
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray, blur, new cv.Size(7,7), 0);
-    cv.Canny(blur, edges, 50, 150);
+    cv.Canny(blur, edges, 50, 140);
+
     cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-    overlayCtx.clearRect(0, 0, w, h);
+    overlayCtx.clearRect(0,0,w,h);
 
     let best = null;
     let maxArea = 0;
@@ -165,24 +191,25 @@ function startDetectionLoop() {
       let cnt = contours.get(i);
       let peri = cv.arcLength(cnt, true);
       let approx = new cv.Mat();
-      cv.approxPolyDP(cnt, approx, peri * 0.02, true);
+
+      cv.approxPolyDP(cnt, approx, peri * 0.03, true);
 
       if (approx.rows === 4) {
         let area = cv.contourArea(cnt);
         if (area > maxArea) {
           maxArea = area;
-          if (best) best.delete();
           best = approx;
         }
       } else approx.delete();
+
       cnt.delete();
     }
 
-    if (best && maxArea > (w*h*0.12)) {
+    if (best && maxArea > (w*h*0.10)) {
       let pts = [];
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 4; i++)
         pts.push({ x: best.intAt(i,0), y: best.intAt(i,1) });
-      }
+
       lastQuad = pts;
 
       overlayCtx.beginPath();
@@ -191,9 +218,10 @@ function startDetectionLoop() {
       overlayCtx.lineTo(pts[2].x, pts[2].y);
       overlayCtx.lineTo(pts[3].x, pts[3].y);
       overlayCtx.closePath();
-
       overlayCtx.lineWidth = 4;
       overlayCtx.strokeStyle = "lime";
+      overlayCtx.shadowColor = "lime";
+      overlayCtx.shadowBlur = 20;
       overlayCtx.stroke();
 
       setInfo("📄 Document detected");
@@ -203,36 +231,55 @@ function startDetectionLoop() {
 
       prevQuad = pts;
 
-      if (stableCount > 10 && !captureCooldown) triggerAutoCapture();
+      if (stableCount > 10) autoCapture();
     }
     else {
-      setInfo("Searching document...");
       lastQuad = null;
-      stableCount = 0;
       prevQuad = null;
+      stableCount = 0;
+      setInfo("Searching document...");
     }
 
-    src.delete(), gray.delete(), blur.delete();
-    edges.delete(), contours.delete(), hierarchy.delete();
+    src.delete(); gray.delete(); blur.delete();
+    edges.delete(); contours.delete(); hierarchy.delete();
 
     requestAnimationFrame(step);
   }
   step();
 }
 
-/* ================= CAPTURE BUTTON ================= */
+/* ==========================
+      CAPTURE HQ + SCAN FILTER
+========================== */
 document.getElementById("captureBtn").onclick = async () => {
   const video = document.getElementById("video");
 
+  const track = stream.getVideoTracks()[0];
+  const settings = track.getSettings();
+
+  const realW = settings.width;     // FULL RESOLUTION!!!
+  const realH = settings.height;
+
   const base = document.createElement("canvas");
-  base.width = video.videoWidth;
-  base.height = video.videoHeight;
-  base.getContext("2d").drawImage(video, 0, 0);
+  base.width = realW;
+  base.height = realH;
+  base.getContext("2d").drawImage(video, 0, 0, realW, realH);
 
   let finalCanvas = base;
 
-  if (lastQuad && cvReady) {
+  if (lastQuad) {
     let pts = lastQuad;
+
+    let src = cv.imread(base);
+    let dst = new cv.Mat();
+
+    let srcTri = cv.matFromArray(4,1,cv.CV_32FC2,[
+      pts[0].x,pts[0].y,
+      pts[1].x,pts[1].y,
+      pts[2].x,pts[2].y,
+      pts[3].x,pts[3].y
+    ]);
+
     let w1 = Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
     let w2 = Math.hypot(pts[2].x-pts[3].x, pts[2].y-pts[3].y);
     let h1 = Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y);
@@ -241,14 +288,6 @@ document.getElementById("captureBtn").onclick = async () => {
     let dstW = Math.max(w1, w2);
     let dstH = Math.max(h1, h2);
 
-    let src = cv.imread(base);
-    let dst = new cv.Mat();
-
-    let srcTri = cv.matFromArray(4,1,cv.CV_32FC2,[
-      pts[0].x,pts[0].y, pts[1].x,pts[1].y,
-      pts[2].x,pts[2].y, pts[3].x,pts[3].y
-    ]);
-
     let dstTri = cv.matFromArray(4,1,cv.CV_32FC2,[
       0,0, dstW,0, dstW,dstH, 0,dstH
     ]);
@@ -256,49 +295,46 @@ document.getElementById("captureBtn").onclick = async () => {
     let M = cv.getPerspectiveTransform(srcTri, dstTri);
     cv.warpPerspective(src, dst, M, new cv.Size(dstW, dstH));
 
+    /* === SCANNER FILTER (optional) === */
+    // cv.cvtColor(dst, dst, cv.COLOR_RGBA2GRAY);
+    // cv.adaptiveThreshold(dst, dst, 255,
+    //   cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 15, 5
+    // );
+
     finalCanvas = document.createElement("canvas");
     finalCanvas.width = dstW;
     finalCanvas.height = dstH;
+
     cv.imshow(finalCanvas, dst);
+
+    src.delete(); dst.delete(); srcTri.delete(); dstTri.delete(); M.delete();
   }
 
-  const blob = await new Promise(r => finalCanvas.toBlob(r));
+  const blob = await new Promise(r => finalCanvas.toBlob(r, "image/jpeg", 0.95));
   const url = URL.createObjectURL(blob);
 
   images.push({ blob, url });
-  saveBtn.classList.remove("hidden");
   renderImages();
+  saveBtn.classList.remove("hidden");
 };
 
-/* ================= PREVIEW RENDER ================= */
+/* ==========================
+      PREVIEW LIST
+========================== */
 function renderImages() {
   previewEl.innerHTML = "";
   images.forEach((img, i) => {
     previewEl.innerHTML += `
-      <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
-        <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover"/>
-        <button data-i="${i}" class="ml-auto px-2 py-1 bg-red-600 rounded-full text-xs">🗑 Delete</button>
-      </div>
-    `;
+    <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
+      <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover"/>
+      <button class="ml-auto bg-red-600 text-xs rounded-full px-2 py-1"
+              onclick="images.splice(${i},1); renderImages();">🗑 Delete</button>
+    </div>`;
   });
-
-  document.querySelectorAll("button[data-i]").forEach(btn =>
-    btn.onclick = () => { images.splice(btn.dataset.i,1); renderImages(); }
-  );
 }
-
-/* ================= OPEN CAMERA ================= */
-document.getElementById("startBtn").onclick = async () => {
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" }
-  });
-
-  document.getElementById("video").srcObject = stream;
-  document.getElementById("camera-box").classList.remove("hidden");
-
-  startDetectionLoop();
-};
 </script>
+
+
 
 </body>
 </html>
