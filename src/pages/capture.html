@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fast Capture</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- OpenCV.js -->
-  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+  <!-- OpenCV.js – DEFER, async EMAS -->
+  <script defer src="https://docs.opencv.org/4.x/opencv.js"></script>
 </head>
 
 <body class="bg-slate-900 text-white min-h-screen">
@@ -39,7 +39,7 @@
       </button>
     </div>
 
-    <!-- EDIT BOX (CamScanner style) -->
+    <!-- EDIT BOX -->
     <div id="editBox"
       class="hidden mt-4 border border-slate-700 rounded-xl overflow-hidden">
       <div class="relative">
@@ -66,24 +66,25 @@
   </div>
 
 <script>
+window.addEventListener("load", () => {
 /* ==========================
    GLOBAL
 ========================== */
 let cvReady = false;
 let stream = null;
-let images = [];      // { blob, url }
-let capturedCanvas = null; // original full photo
+let images = [];
+let capturedCanvas = null;
 let editScaleX = 1, editScaleY = 1;
-let corners = [];     // 4 point {x,y} in editCanvas coords
+let corners = [];
 let draggingIndex = -1;
 
-const statusEl = document.getElementById("status");
-const videoEl = document.getElementById("video");
-const cameraBox = document.getElementById("cameraBox");
-const editBox = document.getElementById("editBox");
+const statusEl   = document.getElementById("status");
+const videoEl    = document.getElementById("video");
+const cameraBox  = document.getElementById("cameraBox");
+const editBox    = document.getElementById("editBox");
 const editCanvas = document.getElementById("editCanvas");
-const editCtx = editCanvas.getContext("2d");
-const previewEl = document.getElementById("preview");
+const editCtx    = editCanvas.getContext("2d");
+const previewEl  = document.getElementById("preview");
 const saveAllBtn = document.getElementById("saveAllBtn");
 
 function setStatus(t){ statusEl.textContent = t || ""; }
@@ -91,33 +92,40 @@ function setStatus(t){ statusEl.textContent = t || ""; }
 /* ==========================
    OpenCV READY
 ========================== */
-cv['onRuntimeInitialized'] = () => {
-  cvReady = true;
-  setStatus("✅ AI engine loaded.");
-};
+if (window.cv) {
+  cv['onRuntimeInitialized'] = () => {
+    cvReady = true;
+    setStatus("✅ AI engine loaded.");
+    console.log("OpenCV ready");
+  };
+} else {
+  console.warn("cv not defined yet – but script is deferred, so it should appear soon");
+}
 
 /* ==========================
    CAMERA START
 ========================== */
 document.getElementById("startBtn").onclick = async () => {
-  if (!cvReady) {
-    setStatus("⏳ Loading AI, please wait...");
-    return;
-  }
-
+  // Kamera OpenCV-ga bog‘liq emas – baribir ochilsin
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "environment", width: {ideal:1920}, height:{ideal:1080} }
     });
   } catch (e) {
     console.error(e);
-    setStatus("❌ Camera permission denied.");
+    setStatus("❌ Camera permission denied or blocked.");
     return;
   }
 
   videoEl.srcObject = stream;
   cameraBox.classList.remove("hidden");
-  setStatus("📷 Point the camera at the document.");
+  editBox.classList.add("hidden");
+
+  if (!cvReady) {
+    setStatus("📷 Camera ready. AI still loading, auto-detect may be delayed...");
+  } else {
+    setStatus("📷 Point the camera at the document.");
+  }
 };
 
 /* ==========================
@@ -126,17 +134,16 @@ document.getElementById("startBtn").onclick = async () => {
 document.getElementById("captureBtn").onclick = () => {
   if (!stream) return;
 
-  const track = stream.getVideoTracks()[0];
+  const track    = stream.getVideoTracks()[0];
   const settings = track.getSettings();
-  const w = settings.width || videoEl.videoWidth;
-  const h = settings.height || videoEl.videoHeight;
+  const w        = settings.width  || videoEl.videoWidth;
+  const h        = settings.height || videoEl.videoHeight;
 
   capturedCanvas = document.createElement("canvas");
-  capturedCanvas.width = w;
+  capturedCanvas.width  = w;
   capturedCanvas.height = h;
   capturedCanvas.getContext("2d").drawImage(videoEl, 0, 0, w, h);
 
-  // Open "edit" screen like CamScanner
   openEditScreen();
 };
 
@@ -149,26 +156,33 @@ function openEditScreen() {
   const imgW = capturedCanvas.width;
   const imgH = capturedCanvas.height;
 
-  // display width = container width (max 480)
   const displayW = 360;
-  const ratio = imgW / imgH;
+  const ratio    = imgW / imgH;
   const displayH = Math.round(displayW / ratio);
 
-  editCanvas.width = displayW;
+  editCanvas.width  = displayW;
   editCanvas.height = displayH;
 
   editScaleX = displayW / imgW;
   editScaleY = displayH / imgH;
 
-  // draw image
   editCtx.clearRect(0,0,displayW,displayH);
   editCtx.drawImage(capturedCanvas, 0, 0, displayW, displayH);
 
-  // detect document on full-res image, then map to edit coords
-  corners = detectDocumentOnCanvas(capturedCanvas).map(p => ({
-    x: p.x * editScaleX,
-    y: p.y * editScaleY
-  }));
+  if (cvReady) {
+    corners = detectDocumentOnCanvas(capturedCanvas).map(p => ({
+      x: p.x * editScaleX,
+      y: p.y * editScaleY
+    }));
+  } else {
+    // AI yuklanmagan bo‘lsa – butun sahifani o‘ramiz
+    corners = [
+      {x: 10,               y: 10},
+      {x: displayW - 10,    y: 10},
+      {x: displayW - 10,    y: displayH - 10},
+      {x: 10,               y: displayH - 10}
+    ];
+  }
 
   drawEditOverlay();
   editBox.classList.remove("hidden");
@@ -177,21 +191,19 @@ function openEditScreen() {
 
 /* ==========================
    DOCUMENT DETECT (OpenCV)
-   input: HTMLCanvasElement (full res)
-   return: 4 points in image coords
 ========================== */
 function detectDocumentOnCanvas(canvas) {
-  const src = cv.imread(canvas);
-  const gray = new cv.Mat();
-  const blur = new cv.Mat();
-  const edges = new cv.Mat();
-  const contours = new cv.MatVector();
+  const src       = cv.imread(canvas);
+  const gray      = new cv.Mat();
+  const blur      = new cv.Mat();
+  const edges     = new cv.Mat();
+  const contours  = new cv.MatVector();
   const hierarchy = new cv.Mat();
 
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
   cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
 
-  const v = cv.mean(gray)[0];
+  const v     = cv.mean(gray)[0];
   const lower = Math.max(0, v*0.66);
   const upper = Math.min(255, v*1.33);
   cv.Canny(blur, edges, lower, upper);
@@ -204,14 +216,13 @@ function detectDocumentOnCanvas(canvas) {
 
   const w = canvas.width;
   const h = canvas.height;
-  let best = null;
   let bestPts = null;
   let maxArea = 0;
 
   for (let i = 0; i < contours.size(); i++) {
-    const cnt = contours.get(i);
-    const peri = cv.arcLength(cnt, true);
-    const approx = new cv.Mat();
+    const cnt   = contours.get(i);
+    const peri  = cv.arcLength(cnt, true);
+    const approx= new cv.Mat();
     cv.approxPolyDP(cnt, approx, peri*0.02, true);
 
     if (approx.rows === 4) {
@@ -222,7 +233,6 @@ function detectDocumentOnCanvas(canvas) {
       const area = cv.contourArea(cnt);
       if (area > maxArea && area > w*h*0.05) {
         maxArea = area;
-        best = approx;
         bestPts = pts;
       }
     }
@@ -232,39 +242,36 @@ function detectDocumentOnCanvas(canvas) {
   edges.delete(); contours.delete(); hierarchy.delete(); kernel.delete();
 
   if (!bestPts) {
-    // fallback: whole image
     return [
-      {x: 10,      y: 10},
-      {x: w - 10,  y: 10},
-      {x: w - 10,  y: h - 10},
-      {x: 10,      y: h - 10}
+      {x: 10,     y: 10},
+      {x: w-10,   y: 10},
+      {x: w-10,   y: h-10},
+      {x: 10,     y: h-10}
     ];
   }
 
-  // sort TL,TR,BR,BL
   bestPts.sort((a,b) => (a.y-b.y)||(a.x-b.x));
-  const top = bestPts.slice(0,2).sort((a,b)=>a.x-b.x);
+  const top    = bestPts.slice(0,2).sort((a,b)=>a.x-b.x);
   const bottom = bestPts.slice(2,4).sort((a,b)=>a.x-b.x);
   return [top[0], top[1], bottom[1], bottom[0]];
 }
 
 /* ==========================
-   DRAW OVERLAY (corners)
+   DRAW OVERLAY
 ========================== */
 function drawEditOverlay() {
   const w = editCanvas.width;
   const h = editCanvas.height;
 
-  // rasmni qayta chizamiz
   editCtx.clearRect(0,0,w,h);
   editCtx.drawImage(capturedCanvas, 0, 0, w, h);
 
   if (!corners || corners.length !== 4) return;
 
-  editCtx.lineWidth = 2;
+  editCtx.lineWidth   = 2;
   editCtx.strokeStyle = "#22c55e";
   editCtx.shadowColor = "#22c55e";
-  editCtx.shadowBlur = 12;
+  editCtx.shadowBlur  = 12;
 
   editCtx.beginPath();
   editCtx.moveTo(corners[0].x, corners[0].y);
@@ -272,7 +279,6 @@ function drawEditOverlay() {
   editCtx.closePath();
   editCtx.stroke();
 
-  // circles
   editCtx.shadowBlur = 0;
   for (const p of corners) {
     editCtx.beginPath();
@@ -286,21 +292,21 @@ function drawEditOverlay() {
 }
 
 /* ==========================
-   DRAG HANDLES (mouse + touch)
+   DRAG HANDLES
 ========================== */
-function getPosFromEvent(e){
+function getPos(e){
   const rect = editCanvas.getBoundingClientRect();
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-  return { x: clientX - rect.left, y: clientY - rect.top };
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  return {x,y};
 }
 
 editCanvas.addEventListener("pointerdown", e => {
   if (!corners.length) return;
-  const pos = getPosFromEvent(e);
-  for (let i=0; i<4; i++) {
+  const pos = getPos(e);
+  for (let i=0;i<4;i++){
     const p = corners[i];
-    const d = Math.hypot(p.x - pos.x, p.y - pos.y);
+    const d = Math.hypot(p.x-pos.x, p.y-pos.y);
     if (d < 20) {
       draggingIndex = i;
       editCanvas.setPointerCapture(e.pointerId);
@@ -311,18 +317,14 @@ editCanvas.addEventListener("pointerdown", e => {
 
 editCanvas.addEventListener("pointermove", e => {
   if (draggingIndex === -1) return;
-  const pos = getPosFromEvent(e);
+  const pos = getPos(e);
   corners[draggingIndex].x = pos.x;
   corners[draggingIndex].y = pos.y;
   drawEditOverlay();
 });
 
-editCanvas.addEventListener("pointerup", e => {
-  draggingIndex = -1;
-});
-editCanvas.addEventListener("pointercancel", e => {
-  draggingIndex = -1;
-});
+editCanvas.addEventListener("pointerup",   () => draggingIndex=-1);
+editCanvas.addEventListener("pointercancel",() => draggingIndex=-1);
 
 /* ==========================
    RETAKE / SAVE CROP
@@ -335,10 +337,6 @@ document.getElementById("retakeBtn").onclick = () => {
 document.getElementById("saveCropBtn").onclick = async () => {
   if (!capturedCanvas || corners.length !== 4) return;
 
-  const imgW = capturedCanvas.width;
-  const imgH = capturedCanvas.height;
-
-  // cornersni original rasm koordinatasiga qaytaramiz
   const ptsImg = corners.map(p => ({
     x: p.x / editScaleX,
     y: p.y / editScaleY
@@ -359,24 +357,24 @@ document.getElementById("saveCropBtn").onclick = async () => {
   const h1 = Math.hypot(ptsImg[3].x-ptsImg[0].x, ptsImg[3].y-ptsImg[0].y);
   const h2 = Math.hypot(ptsImg[2].x-ptsImg[1].x, ptsImg[2].y-ptsImg[1].y);
 
-  const dstW = Math.max(w1, w2);
-  const dstH = Math.max(h1, h2);
+  const dstW = Math.max(w1,w2);
+  const dstH = Math.max(h1,h2);
 
   const dstTri = cv.matFromArray(4,1,cv.CV_32FC2,[0,0,dstW,0,dstW,dstH,0,dstH]);
 
-  const M = cv.getPerspectiveTransform(srcTri, dstTri);
-  cv.warpPerspective(src, dst, M, new cv.Size(dstW, dstH));
+  const M = cv.getPerspectiveTransform(srcTri,dstTri);
+  cv.warpPerspective(src,dst,M,new cv.Size(dstW,dstH));
 
   const outCanvas = document.createElement("canvas");
-  outCanvas.width = dst.cols;
+  outCanvas.width  = dst.cols;
   outCanvas.height = dst.rows;
-  cv.imshow(outCanvas, dst);
+  cv.imshow(outCanvas,dst);
 
   src.delete(); dst.delete(); srcTri.delete(); dstTri.delete(); M.delete();
 
   const blob = await new Promise(r => outCanvas.toBlob(r,"image/jpeg",0.95));
-  const url = URL.createObjectURL(blob);
-  images.push({ blob, url });
+  const url  = URL.createObjectURL(blob);
+  images.push({blob,url});
   renderImages();
 
   editBox.classList.add("hidden");
@@ -389,27 +387,28 @@ document.getElementById("saveCropBtn").onclick = async () => {
 ========================== */
 function renderImages(){
   previewEl.innerHTML = "";
-  images.forEach((img, i) => {
+  images.forEach((img,i)=>{
     previewEl.innerHTML += `
       <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
         <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover" />
         <span class="text-xs opacity-75">Page ${i+1}</span>
         <button class="ml-auto bg-red-600 text-xs rounded-full px-2 py-1"
-          onclick="images.splice(${i},1); renderImages(); if(!images.length) saveAllBtn.classList.add('hidden');">
+          onclick="deleteImage(${i})">
           🗑 Delete
         </button>
       </div>`;
   });
 }
 
+
 /* ==========================
    UPLOAD ALL (stub)
 ========================== */
 document.getElementById("saveAllBtn").onclick = () => {
-  // Bu yerga backend / Telegramga yuborish kodini qo‘shasan.
-  alert("Here you can upload all photos to your server / bot. Images count: " + images.length);
+  alert("Here you can upload all photos. Count: " + images.length);
 };
 
+}); // window load
 </script>
 </body>
 </html>
