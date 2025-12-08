@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- OpenCV.js for AI -->
     <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+    <!-- jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   </head>
 
   <body class="bg-slate-900 text-white min-h-screen">
@@ -22,7 +24,7 @@
 
         <button id="saveBtn"
           class="flex-1 bg-blue-600 p-3 rounded-full hidden active:scale-95 transition">
-          💾 Upload All Photos
+          💾 Download PDF
         </button>
       </div>
 
@@ -31,7 +33,7 @@
       <!-- CAMERA BOX -->
       <div id="camera-box" class="hidden mt-4 relative">
 
-        <!-- FLASH STATUS OVERLAY -->
+        <!-- FLASH STATUS OVERLAY (faqat UI) -->
         <div id="flashOnScreen"
           class="absolute top-3 right-3 bg-yellow-500 px-3 py-1 rounded-full text-xs hidden z-20">
           🔦 Flash
@@ -50,22 +52,24 @@
         <canvas id="overlay"
           class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
 
-        <!-- ⭐ FOCUS RING (NEW) -->
-        <div id="focusRing"
-          class="absolute w-20 h-20 rounded-full border-4 border-yellow-300 hidden z-30 transition-all duration-300"
-          style="pointer-events:none;"></div>
-
-        <!-- FLASH BUTTON -->
-        <button id="flashBtn"
-          class="absolute bottom-20 right-3 bg-yellow-600 p-2 rounded-full hidden active:scale-95 transition text-sm z-20">
-          🔦
-        </button>
-
         <!-- CAPTURE BUTTON -->
         <button id="captureBtn"
           class="w-full mt-3 bg-emerald-500 p-3 rounded-full active:scale-95 transition relative z-20">
           📷 Capture Photo
         </button>
+      </div>
+
+      <!-- FILTER MODE -->
+      <div class="mt-4 text-xs flex items-center gap-2">
+        <span class="opacity-70">Filter:</span>
+        <select id="filterMode"
+          class="bg-slate-800 border border-slate-700 text-xs rounded-full px-3 py-1">
+          <option value="auto">Auto (CamScanner style)</option>
+          <option value="color">Magic Color</option>
+          <option value="gray">Gray</option>
+          <option value="bw">Black & White</option>
+          <option value="none">Original</option>
+        </select>
       </div>
 
       <!-- PREVIEW -->
@@ -78,7 +82,7 @@
       GLOBAL VARIABLES
 ========================== */
 let stream = null;
-let images = [];
+let images = [];      // {blob, url}
 let videoTrack = null;
 let cvReady = false;
 let lastQuad = null;
@@ -96,26 +100,54 @@ const overlayCanvas = document.getElementById("overlay");
 const overlayCtx = overlayCanvas.getContext("2d");
 const infoOverlay = document.getElementById("infoOverlay");
 const statusEl = document.getElementById("status");
+const filterModeEl = document.getElementById("filterMode");
 
 function setInfo(t){ infoOverlay.textContent = t }
 function setStatus(t){ statusEl.textContent = t }
 
 /* ==========================
+      WAIT FOR OpenCV
+========================== */
+function waitForCVReady() {
+  return new Promise(resolve => {
+    function check() {
+      if (window.cv && typeof cv.Mat === "function") {
+        cvReady = true;
+        resolve();
+      } else {
+        requestAnimationFrame(check);
+      }
+    }
+    check();
+  });
+}
+
+/* ==========================
       HIGH RES CAMERA
 ========================== */
 document.getElementById("startBtn").onclick = async () => {
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: "environment",
-      width: { ideal: 4096 },   // 4K+
-      height: { ideal: 2160 }   // 4K+
-    }
-  });
+  setStatus("⏳ Loading AI & camera...");
+  await waitForCVReady();
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width:  { ideal: 1920 },   // 1080p – real telefonlarda yetarli
+        height: { ideal: 1080 }
+      }
+    });
+  } catch (e) {
+    console.error(e);
+    setStatus("❌ Camera permission denied.");
+    return;
+  }
 
   videoTrack = stream.getVideoTracks()[0];
   document.getElementById("video").srcObject = stream;
   document.getElementById("camera-box").classList.remove("hidden");
 
+  setStatus("✅ Camera ready. Hold document inside frame.");
   startDetectionLoop();
 };
 
@@ -127,7 +159,18 @@ function isSameQuad(q1, q2) {
   let d = 0;
   for (let i = 0; i < 4; i++)
     d += Math.hypot(q1[i].x - q2[i].x, q1[i].y - q2[i].y);
-  return d < 35;
+  return d < 15; // sezgirlikni oshirdik
+}
+
+/* ==========================
+      QUAD SORT (TL,TR,BR,BL)
+========================== */
+function sortCorners(pts) {
+  // chap/yuqori bo‘yicha taxmin
+  pts.sort((a,b) => (a.y - b.y) || (a.x - b.x));
+  const top = pts.slice(0,2).sort((a,b)=>a.x-b.x);
+  const bottom = pts.slice(2,4).sort((a,b)=>a.x-b.x);
+  return [top[0], top[1], bottom[1], bottom[0]]; // TL,TR,BR,BL
 }
 
 /* ==========================
@@ -141,11 +184,25 @@ async function autoCapture() {
 
   setTimeout(() => {
     overlayCanvas.style.boxShadow = "none";
-  }, 500);
+  }, 400);
 
   document.getElementById("captureBtn").click();
 
-  setTimeout(() => autoCooldown = false, 1200);
+  setTimeout(() => autoCooldown = false, 1300);
+}
+
+/* ==========================
+      BLUR / SHARPNESS CHECK
+========================== */
+function isFrameSharp(grayMat) {
+  let lap = new cv.Mat();
+  cv.Laplacian(grayMat, lap, cv.CV_64F);
+  const data = lap.data64F;
+  let mean = 0;
+  for (let i = 0; i < data.length; i++) mean += Math.abs(data[i]);
+  mean /= data.length;
+  lap.delete();
+  return mean > 8; // tajribaviy threshold
 }
 
 /* ==========================
@@ -157,7 +214,10 @@ function startDetectionLoop() {
   const ctx = temp.getContext("2d");
 
   function step() {
-    if (!stream || !video.videoWidth) return requestAnimationFrame(step);
+    if (!stream || !video.videoWidth) {
+      requestAnimationFrame(step);
+      return;
+    }
 
     const w = video.videoWidth;
     const h = video.videoHeight;
@@ -178,7 +238,7 @@ function startDetectionLoop() {
 
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray, blur, new cv.Size(7,7), 0);
-    cv.Canny(blur, edges, 50, 140);
+    cv.Canny(blur, edges, 50, 150);
 
     cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
@@ -200,16 +260,18 @@ function startDetectionLoop() {
           maxArea = area;
           best = approx;
         }
-      } else approx.delete();
-
+      } else {
+        approx.delete();
+      }
       cnt.delete();
     }
 
-    if (best && maxArea > (w*h*0.10)) {
+    if (best && maxArea > (w*h*0.15)) {
       let pts = [];
       for (let i = 0; i < 4; i++)
         pts.push({ x: best.intAt(i,0), y: best.intAt(i,1) });
 
+      pts = sortCorners(pts);
       lastQuad = pts;
 
       overlayCtx.beginPath();
@@ -221,17 +283,22 @@ function startDetectionLoop() {
       overlayCtx.lineWidth = 4;
       overlayCtx.strokeStyle = "lime";
       overlayCtx.shadowColor = "lime";
-      overlayCtx.shadowBlur = 20;
+      overlayCtx.shadowBlur = 18;
       overlayCtx.stroke();
 
-      setInfo("📄 Document detected");
+      const sharp = isFrameSharp(gray);
+      if (!sharp) {
+        setInfo("🔍 Hold still – image is blurry");
+        stableCount = 0;
+      } else {
+        setInfo("📄 Document detected – keep still...");
+        if (isSameQuad(prevQuad, pts)) stableCount++;
+        else stableCount = 0;
 
-      if (isSameQuad(prevQuad, pts)) stableCount++;
-      else stableCount = 0;
+        prevQuad = pts;
 
-      prevQuad = pts;
-
-      if (stableCount > 10) autoCapture();
+        if (stableCount > 10) autoCapture();
+      }
     }
     else {
       lastQuad = null;
@@ -249,16 +316,65 @@ function startDetectionLoop() {
 }
 
 /* ==========================
+      SCANNER FILTERS
+========================== */
+function applyFilter(dst, mode) {
+  if (mode === "none") return dst;
+
+  if (mode === "gray") {
+    cv.cvtColor(dst, dst, cv.COLOR_RGBA2GRAY);
+    cv.equalizeHist(dst, dst);
+    return dst;
+  }
+
+  if (mode === "bw") {
+    cv.cvtColor(dst, dst, cv.COLOR_RGBA2GRAY);
+    cv.adaptiveThreshold(
+      dst, dst, 255,
+      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+      cv.THRESH_BINARY,
+      25,
+      8
+    );
+    return dst;
+  }
+
+  if (mode === "color") {
+    cv.cvtColor(dst, dst, cv.COLOR_RGBA2RGB);
+    cv.detailEnhance(dst, dst, 10, 0.15);
+    return dst;
+  }
+
+  // auto: hujjat oq fon + qora matn bo‘lsa B/W, aks holda magic color
+  let tmp = new cv.Mat();
+  cv.cvtColor(dst, tmp, cv.COLOR_RGBA2GRAY);
+  let hist = new cv.Mat();
+  cv.calcHist(tmp, [0], new cv.Mat(), hist, [64], [0,256]);
+  // juda qo‘pol auto heuristika
+  let bright = 0;
+  for (let i = 40; i < 64; i++) bright += hist.data32F[i] || 0;
+  hist.delete();
+  if (bright > tmp.rows * tmp.cols * 0.4) {
+    // B/W hujjat
+    tmp.delete();
+    return applyFilter(dst, "bw");
+  } else {
+    tmp.delete();
+    return applyFilter(dst, "color");
+  }
+}
+
+/* ==========================
       CAPTURE HQ + SCAN FILTER
 ========================== */
 document.getElementById("captureBtn").onclick = async () => {
+  if (!stream) return;
   const video = document.getElementById("video");
 
   const track = stream.getVideoTracks()[0];
   const settings = track.getSettings();
-
-  const realW = settings.width;     // FULL RESOLUTION!!!
-  const realH = settings.height;
+  const realW = settings.width || video.videoWidth;
+  const realH = settings.height || video.videoHeight;
 
   const base = document.createElement("canvas");
   base.width = realW;
@@ -295,27 +411,24 @@ document.getElementById("captureBtn").onclick = async () => {
     let M = cv.getPerspectiveTransform(srcTri, dstTri);
     cv.warpPerspective(src, dst, M, new cv.Size(dstW, dstH));
 
-    /* === SCANNER FILTER (optional) === */
-    // cv.cvtColor(dst, dst, cv.COLOR_RGBA2GRAY);
-    // cv.adaptiveThreshold(dst, dst, 255,
-    //   cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 15, 5
-    // );
+    // CamScanner style filter
+    applyFilter(dst, filterModeEl.value);
 
     finalCanvas = document.createElement("canvas");
-    finalCanvas.width = dstW;
-    finalCanvas.height = dstH;
-
+    finalCanvas.width = dst.cols;
+    finalCanvas.height = dst.rows;
     cv.imshow(finalCanvas, dst);
 
     src.delete(); dst.delete(); srcTri.delete(); dstTri.delete(); M.delete();
   }
 
-  const blob = await new Promise(r => finalCanvas.toBlob(r, "image/jpeg", 0.95));
+  const blob = await new Promise(r => finalCanvas.toBlob(b => r(b), "image/jpeg", 0.9));
   const url = URL.createObjectURL(blob);
 
   images.push({ blob, url });
   renderImages();
   saveBtn.classList.remove("hidden");
+  setStatus(`📄 Added page ${images.length}.`);
 };
 
 /* ==========================
@@ -326,15 +439,67 @@ function renderImages() {
   images.forEach((img, i) => {
     previewEl.innerHTML += `
     <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
-      <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover"/>
+      <div class="relative">
+        <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover"/>
+        <span class="absolute -top-2 -left-2 bg-slate-900 text-[10px] px-1.5 rounded-full">#${i+1}</span>
+      </div>
       <button class="ml-auto bg-red-600 text-xs rounded-full px-2 py-1"
-              onclick="images.splice(${i},1); renderImages();">🗑 Delete</button>
+              onclick="images.splice(${i},1); renderImages(); if(images.length===0) saveBtn.classList.add('hidden');">
+        🗑 Delete
+      </button>
     </div>`;
   });
 }
+
+/* ==========================
+      BLOB → DATAURL
+========================== */
+function blobToDataUrl(blob) {
+  return new Promise(res => {
+    const reader = new FileReader();
+    reader.onloadend = () => res(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/* ==========================
+      DOWNLOAD PDF (CamScanner style)
+========================== */
+saveBtn.onclick = async () => {
+  if (!images.length) return;
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: "mm", format: "a4" });
+
+  for (let i = 0; i < images.length; i++) {
+    if (i > 0) pdf.addPage();
+    const dataUrl = await blobToDataUrl(images[i].blob);
+
+    // A4: 210 × 297 mm, margin 5mm
+    const pageW = 210;
+    const pageH = 297;
+    const margin = 5;
+
+    // rasm nisbatini saqlab joylashtirish
+    const img = new Image();
+    img.src = dataUrl;
+    await new Promise(r => img.onload = r);
+    const imgRatio = img.width / img.height;
+    let w = pageW - margin * 2;
+    let h = w / imgRatio;
+    if (h > pageH - margin * 2) {
+      h = pageH - margin * 2;
+      w = h * imgRatio;
+    }
+    const x = (pageW - w) / 2;
+    const y = (pageH - h) / 2;
+
+    pdf.addImage(dataUrl, "JPEG", x, y, w, h);
+  }
+
+  pdf.save("scan.pdf");
+  setStatus("✅ PDF downloaded.");
+};
+
 </script>
-
-
-
 </body>
 </html>
