@@ -5,15 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Realtime Scanner</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+  <!-- OpenCV MUST NOT be async — we load it first -->
+  <script src="https://docs.opencv.org/4.x/opencv.js"></script>
 
   <style>
     body { background:#0f172a; color:white; }
     #overlayCanvas {
-      position:absolute; 
-      inset:0; 
-      pointer-events:none; 
-      z-index:10;
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      z-index:15;
     }
   </style>
 </head>
@@ -23,14 +25,15 @@
 
   <h2 class="text-xl font-bold mb-4">Realtime Document Scanner</h2>
 
-  <button id="startBtn" class="w-full bg-slate-700 p-3 rounded-full mb-4">
-    📸 Open camera
+  <button id="startBtn"
+    class="w-full bg-slate-700 p-3 rounded-full mb-4">
+    📸 Open Camera
   </button>
 
   <p id="status" class="text-yellow-300 text-xs"></p>
 
   <div id="cameraBox" class="relative hidden">
-    <video id="video" autoplay playsinline 
+    <video id="video" autoplay playsinline
       class="w-full rounded-xl bg-black aspect-[3/4] object-cover"></video>
 
     <canvas id="overlayCanvas"></canvas>
@@ -39,67 +42,86 @@
 </div>
 
 <script>
+/* ===================================
+      WAIT FOR OpenCV TO LOAD
+=================================== */
 let cvReady = false;
-let stream = null;
-
-cv['onRuntimeInitialized'] = () => {
-  cvReady = true;
-  document.getElementById("status").innerText = "AI Loaded!";
-};
-
-document.getElementById("startBtn").onclick = async () => {
-  if (!cvReady) {
-    document.getElementById("status").innerText = "Loading AI...";
-    return;
+window.Module = {
+  onRuntimeInitialized() {
+    cvReady = true;
+    document.getElementById("status").innerText = "AI engine loaded ✔";
   }
-
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode:"environment", width:{ideal:1920}, height:{ideal:1080} }
-  });
-
-  const video = document.getElementById("video");
-  video.srcObject = stream;
-
-  document.getElementById("cameraBox").classList.remove("hidden");
-  document.getElementById("status").innerText = "Point camera at document...";
-
-  startDetectionLoop();
 };
 
-function startDetectionLoop() {
+/* Helper: wait until OpenCV is ready */
+function waitForCV(callback) {
+  if (cvReady && window.cv) callback();
+  else setTimeout(() => waitForCV(callback), 50);
+}
 
+/* ===================================
+       START CAMERA
+=================================== */
+document.getElementById("startBtn").onclick = () => {
+  waitForCV(() => startCamera());
+};
+
+async function startCamera() {
+  document.getElementById("status").innerText = "Opening camera...";
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width:{ideal:1920}, height:{ideal:1080} }
+    });
+
+    const video = document.getElementById("video");
+    video.srcObject = stream;
+
+    document.getElementById("cameraBox").classList.remove("hidden");
+    document.getElementById("status").innerText = "Point camera at document...";
+
+    startDetectionLoop();
+  } catch(e) {
+    document.getElementById("status").innerText = "❌ Camera blocked or unavailable.";
+  }
+}
+
+/* ===================================
+    REALTIME DETECTION LOOP
+=================================== */
+function startDetectionLoop() {
   const video = document.getElementById("video");
   const overlay = document.getElementById("overlayCanvas");
   const ctx = overlay.getContext("2d");
 
   function loop() {
 
-    if (!stream || video.videoWidth === 0) {
+    if (video.videoWidth === 0) {
       requestAnimationFrame(loop);
       return;
     }
 
-    // Canvas size must match video frame
-    overlay.width = video.videoWidth;
+    overlay.width  = video.videoWidth;
     overlay.height = video.videoHeight;
 
-    // Create temp canvas to get frame pixels
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = video.videoWidth;
-    tempCanvas.height = video.videoHeight;
-    const tctx = tempCanvas.getContext("2d");
+    /* Capture current frame */
+    const temp = document.createElement("canvas");
+    temp.width = video.videoWidth;
+    temp.height = video.videoHeight;
+    const tctx = temp.getContext("2d");
     tctx.drawImage(video, 0, 0);
 
-    // Detect document
-    let quad = detectDocument(tempCanvas);
+    /* Detect document */
+    const quad = detectDocument(temp);
 
-    // Draw overlay
+    /* Draw bounding box */
     ctx.clearRect(0,0,overlay.width,overlay.height);
+
     if (quad) {
       ctx.lineWidth = 4;
       ctx.strokeStyle = "lime";
       ctx.shadowColor = "lime";
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = 20;
 
       ctx.beginPath();
       ctx.moveTo(quad[0].x, quad[0].y);
@@ -116,58 +138,71 @@ function startDetectionLoop() {
   loop();
 }
 
+/* ===================================
+         DOCUMENT DETECTOR
+=================================== */
 function detectDocument(canvas) {
-
   const src = cv.imread(canvas);
-  const gray = new cv.Mat();
-  const blur = new cv.Mat();
-  const edges = new cv.Mat();
-  const contours = new cv.MatVector();
+
+  const gray      = new cv.Mat();
+  const blur      = new cv.Mat();
+  const edges     = new cv.Mat();
+  const contours  = new cv.MatVector();
   const hierarchy = new cv.Mat();
 
+  /* Preprocess */
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
   cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
 
-  let v = cv.mean(gray)[0];
-  cv.Canny(blur, edges, v*0.6, v*1.5);
+  const avg = cv.mean(gray)[0];
+  cv.Canny(blur, edges, avg * 0.5, avg * 1.5);
 
+  /* Find external edges only */
   cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
+  const W = canvas.width;
+  const H = canvas.height;
   let best = null;
   let maxArea = 0;
-  const w = canvas.width;
-  const h = canvas.height;
 
   for (let i = 0; i < contours.size(); i++) {
-    let cnt = contours.get(i);
-    let peri = cv.arcLength(cnt, true);
-    let approx = new cv.Mat();
+    const cnt = contours.get(i);
+    const peri = cv.arcLength(cnt, true);
+    const approx = new cv.Mat();
 
     cv.approxPolyDP(cnt, approx, peri * 0.02, true);
 
+    /* Only polygons with 4 sides */
     if (approx.rows === 4) {
-      let pts = [];
-      for (let j=0; j<4; j++) {
+
+      const pts = [];
+      for (let j = 0; j < 4; j++)
         pts.push({ x: approx.intAt(j,0), y: approx.intAt(j,1) });
-      }
 
-      let area = cv.contourArea(cnt);
+      const area = cv.contourArea(cnt);
 
-      if (area > maxArea && area > w*h*0.15) {  
+      /* Must be big enough (15% of frame) */
+      if (area > maxArea && area > W * H * 0.15) {
         maxArea = area;
         best = pts;
       }
     }
+
+    approx.delete();
+    cnt.delete();
   }
 
+  /* Free memory */
   src.delete(); gray.delete(); blur.delete();
   edges.delete(); contours.delete(); hierarchy.delete();
 
   if (!best) return null;
 
-  best.sort((a,b)=> (a.y-b.y)||(a.x-b.x));
+  /* Sort: TL, TR, BR, BL */
+  best.sort((a,b) => (a.y - b.y) || (a.x - b.x));
   const top = best.slice(0,2).sort((a,b)=>a.x-b.x);
   const bot = best.slice(2,4).sort((a,b)=>a.x-b.x);
+
   return [top[0], top[1], bot[1], bot[0]];
 }
 </script>
