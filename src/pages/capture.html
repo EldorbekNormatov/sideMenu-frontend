@@ -1,438 +1,439 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="uz">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fast Capture – Scanner</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fast Capture – AI Scanner (MediaPipe)</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://docs.opencv.org/4.x/opencv.js"></script>
-
+  <!-- jsPDF for multi-page PDF generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body { background:#0f172a; color:white; }
-    #overlayCanvas {
-      position:absolute;
-      inset:0;
-      pointer-events:none;
-      z-index:10;
-    }
-    #focusRing {
-      transition: opacity .2s, transform .2s;
-    }
+    #overlayCanvas { position:absolute; inset:0; pointer-events:none; z-index:10; }
+    #focusRing { transition: opacity .2s, transform .2s; }
   </style>
 </head>
-
 <body>
 <div class="max-w-md mx-auto p-4">
-
-  <h2 class="text-xl font-bold mb-4">Fast Capture</h2>
+  <h2 class="text-xl font-bold mb-4">Fast Capture (AI)</h2>
 
   <div class="flex gap-3 mb-3">
-    <button id="startBtn"
-      class="flex-1 bg-slate-700 p-3 rounded-full active:scale-95 transition">
-      📸 Open Camera
-    </button>
-
-    <button id="saveAllBtn"
-      class="flex-1 bg-blue-600 p-3 rounded-full hidden active:scale-95 transition">
-      💾 Upload All
-    </button>
+    <button id="startBtn" class="flex-1 bg-slate-700 p-3 rounded-full">📸 Open Camera</button>
+    <button id="saveAllBtn" class="flex-1 bg-blue-600 p-3 rounded-full hidden">💾 Upload / Save PDF</button>
   </div>
 
   <p id="status" class="text-xs min-h-[20px] text-yellow-300"></p>
 
   <div id="cameraBox" class="hidden mt-4 relative">
-
-    <div id="requirementReminder"
-      class="absolute top-0 left-0 right-0 p-3 bg-red-800/80 text-white rounded-t-xl z-20 hidden">
-      <p class="font-bold text-sm mb-1">⚠️ MUHIM: Avval tekshiring</p>
-      <ul class="text-xs ml-4 list-disc">
-        <li>Barcha burchaklar ko‘rinsin</li>
-        <li>Imzo bor</li>
-        <li>Muhr / Stiker bor</li>
-      </ul>
-    </div>
-
-    <div id="flashOnScreen"
-      class="absolute top-3 right-3 bg-yellow-500 px-3 py-1 rounded-full text-xs hidden z-20">
-      FLASH
-    </div>
-
-    <div id="infoOverlay"
-      class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/70 px-3 py-1 rounded-full text-xs">
-    </div>
-
-    <video id="video" autoplay playsinline
-      class="w-full rounded-xl bg-black aspect-[3/4] object-cover"></video>
-
+    <div id="infoOverlay" class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/70 px-3 py-1 rounded-full text-xs"></div>
+    <video id="video" autoplay playsinline class="w-full rounded-xl bg-black aspect-[3/4] object-cover"></video>
     <canvas id="overlayCanvas"></canvas>
-
-    <div id="focusRing"
-      class="absolute w-20 h-20 rounded-full border-4 border-yellow-300 hidden"
-      style="pointer-events:none;"></div>
-
-    <button id="flashBtn"
-      class="absolute bottom-20 right-3 bg-yellow-600 p-2 rounded-full hidden active:scale-95 transition text-sm">
-      🔦
-    </button>
-
-    <button id="captureBtn"
-      class="w-full mt-3 bg-emerald-500 p-3 rounded-full active:scale-95 transition">
-      📷 Capture
-    </button>
-
+    <div id="focusRing" class="absolute w-20 h-20 rounded-full border-4 border-yellow-300 hidden" style="pointer-events:none;"></div>
+    <button id="captureBtn" class="w-full mt-3 bg-emerald-500 p-3 rounded-full">📷 Capture</button>
   </div>
 
   <h3 class="mt-6 font-bold text-sm">Received Photos</h3>
   <div id="preview" class="space-y-2 mt-2"></div>
-
 </div>
 
-<script>
-/* ============= GLOBAL STATE ============= */
-let stream = null;
-let videoTrack = null;
-let images = [];
-let torchOn = false;
+<script type="module">
+/* ===========================
+   MediaPipe Tasks Vision setup
+   =========================== */
+import { FilesetResolver, DocumentProcessor } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.1/dist/tasks-vision.js";
 
-let lastQuad = null;
-let prevQuad = null;
-let stableCount = 0;
-let autoBusy = false;
+const STATUS = document.getElementById('status');
+const INFO = document.getElementById('infoOverlay');
+const videoEl = document.getElementById('video');
+const overlay = document.getElementById('overlayCanvas');
+const octx = overlay.getContext('2d');
+const startBtn = document.getElementById('startBtn');
+const captureBtn = document.getElementById('captureBtn');
+const cameraBox = document.getElementById('cameraBox');
+const previewEl = document.getElementById('preview');
+const saveAllBtn = document.getElementById('saveAllBtn');
 
-const STABLE_FRAMES = 10;
-const QUAD_DISTANCE_THR = 40;
+let stream=null, videoTrack=null;
+let images = []; // {canvas, blob, url}
+let detector = null;
+let autoBusy=false;
+let stableCount=0;
+const STABLE_FRAMES = 4;
+const MOVE_THR = 60; // px total quad distance for stability
 
-/* ============= DOM ============= */
-const videoEl = document.getElementById("video");
-const overlay = document.getElementById("overlayCanvas");
-const octx = overlay.getContext("2d");
-const flashBtn = document.getElementById("flashBtn");
-const flashBadge = document.getElementById("flashOnScreen");
-const previewEl = document.getElementById("preview");
-const saveAllBtn = document.getElementById("saveAllBtn");
-const infoEl = document.getElementById("infoOverlay");
-const statusEl = document.getElementById("status");
-const focusRing = document.getElementById("focusRing");
-const requirementReminder = document.getElementById("requirementReminder");
-
-/* ============= HELPERS ============= */
-function setStatus(msg, type="yellow") {
-  statusEl.textContent = msg;
-  statusEl.className =
-    type === "green" ? "text-green-400" :
-    type === "red"   ? "text-red-400"   :
-                       "text-yellow-300";
+function setStatus(msg, type='yellow'){
+  STATUS.textContent = msg;
+  STATUS.className = type==='green' ? 'text-green-400' : type==='red' ? 'text-red-400' : 'text-yellow-300';
 }
-function setInfo(msg) {
-  infoEl.textContent = msg;
-}
+function setInfo(msg){ INFO.textContent = msg; }
 
-function isValidQuad(q) {
-  return q && q.length === 4 && q.every(p => p.x > 5 && p.y > 5);
-}
-
-function orderQuad(pts) {
-  const sum  = pts.map(p => p.x + p.y);
-  const diff = pts.map(p => p.y - p.x);
-  return [
-    pts[sum.indexOf(Math.min(...sum))],   // TL
-    pts[diff.indexOf(Math.min(...diff))], // TR
-    pts[sum.indexOf(Math.max(...sum))],   // BR
-    pts[diff.indexOf(Math.max(...diff))]  // BL
-  ];
+function drawQuadOnOverlay(vertices){
+  if(!vertices) return;
+  octx.clearRect(0,0,overlay.width,overlay.height);
+  octx.beginPath();
+  const toPx = v=>[v.x*overlay.width, v.y*overlay.height];
+  const [a,b,c,d] = vertices.map(toPx);
+  octx.moveTo(a[0],a[1]);
+  octx.lineTo(b[0],b[1]);
+  octx.lineTo(c[0],c[1]);
+  octx.lineTo(d[0],d[1]);
+  octx.closePath();
+  octx.lineWidth=4;
+  octx.strokeStyle='lime';
+  octx.stroke();
 }
 
-function quadDistance(a, b) {
-  if (!a || !b) return Infinity;
-  return a.reduce((sum, p, i) =>
-    sum + Math.hypot(p.x - b[i].x, p.y - b[i].y)
-  , 0);
+/* -------------------------
+   Load MediaPipe Document model
+   ------------------------- */
+async function initDetector(){
+  setStatus('Loading AI model...');
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.1/wasm"
+  );
+  // DocumentProcessor with default document segmenter model built-in
+  detector = await DocumentProcessor.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: "document-processor.task" },
+    runningMode: "VIDEO"
+  });
+  setStatus('Model loaded','green');
 }
 
-/* ============= FLASH ============= */
-async function toggleTorch() {
-  if (!videoTrack) return;
-  const caps = videoTrack.getCapabilities?.();
-  if (!caps?.torch) return;
-
-  torchOn = !torchOn;
-  await videoTrack.applyConstraints({ advanced:[{torch:torchOn}] });
-}
-
-async function flashBurst() {
-  if (!videoTrack) return;
-  const caps = videoTrack.getCapabilities?.();
-  if (!caps?.torch) return;
-
-  await videoTrack.applyConstraints({ advanced:[{torch:true}] });
-  flashBadge.classList.remove("hidden");
-
-  await new Promise(r=>setTimeout(r,250));
-
-  flashBadge.classList.add("hidden");
-  await videoTrack.applyConstraints({ advanced:[{torch:torchOn}] });
-}
-
-/* ============= CAMERA ============= */
-document.getElementById("startBtn").onclick = async () => {
+/* -------------------------
+   Camera start
+   ------------------------- */
+startBtn.onclick = async () => {
   try {
-    setStatus("Opening camera...");
+    setStatus('Opening camera...');
     stream = await navigator.mediaDevices.getUserMedia({
-      video:{
-        facingMode:{ ideal:"environment" },
-        width:{ ideal:1920 },
-        height:{ ideal:1080 }
-      }
+      video:{ facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio:false
     });
-  } catch(e) {
-    setStatus("❌ Camera permission denied","red");
+  } catch(e){
+    setStatus('❌ Camera permission denied','red');
     return;
   }
 
   videoTrack = stream.getVideoTracks()[0];
-  if (videoTrack.getCapabilities?.().torch) flashBtn.classList.remove("hidden");
-
   videoEl.srcObject = stream;
-  document.getElementById("cameraBox").classList.remove("hidden");
-  requirementReminder.classList.remove("hidden");
+  cameraBox.classList.remove('hidden');
+  setStatus('Camera ready','green');
 
-  setStatus("Camera ready","green");
+  // Wait for metadata
+  await new Promise(r=> videoEl.onloadedmetadata = r);
+  overlay.width = videoEl.videoWidth;
+  overlay.height = videoEl.videoHeight;
 
-  startDetectionLoop();
+  // init detector if not
+  if(!detector) await initDetector();
+
+  startLoop();
 };
 
-flashBtn.onclick = toggleTorch;
+/* -------------------------
+   Detection loop (MediaPipe)
+   ------------------------- */
+let lastVertices = null;
 
-/* ============= TAP TO FOCUS ============= */
-videoEl.addEventListener("click", async (e) => {
-  if (!videoTrack) return;
-
-  const rect = videoEl.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / rect.width;
-  const y = (e.clientY - rect.top) / rect.height;
-
-  focusRing.style.left = (e.clientX - rect.left - 40)+"px";
-  focusRing.style.top  = (e.clientY - rect.top  - 40)+"px";
-  focusRing.classList.remove("hidden");
-  setTimeout(()=>focusRing.classList.add("hidden"),600);
-
-  await videoTrack.applyConstraints({
-    advanced:[{ pointsOfInterest:[{x,y}] }]
-  });
-
-  setInfo("🎯 Focus adjusted");
-});
-
-/* ============= DETECTION LOOP ============= */
-function startDetectionLoop() {
-  const temp = document.createElement("canvas");
-  const tctx = temp.getContext("2d");
-
-  function step() {
+async function startLoop(){
+  async function step(){
     if (!stream) return;
-
-    const w = videoEl.videoWidth;
-    const h = videoEl.videoHeight;
-    if (!w || !h) return requestAnimationFrame(step);
-
-    overlay.width = w;
-    overlay.height = h;
-    temp.width = w;
-    temp.height = h;
-
-    tctx.drawImage(videoEl,0,0,w,h);
-
-    if (!window.cv || !cv.Mat) {
-      setInfo("⏳ AI loading...");
-      return requestAnimationFrame(step);
-    }
-
     try {
-      const src = cv.imread(temp);
-      const gray=new cv.Mat(),blur=new cv.Mat(),edges=new cv.Mat();
-      const contours=new cv.MatVector(),hier=new cv.Mat();
+      // MediaPipe API expects ImageSource-like object and timestamp
+      const ts = performance.now();
+      const result = detector.detectForVideo(videoEl, ts);
 
-      cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
-      cv.GaussianBlur(gray,blur,new cv.Size(5,5),0);
+      if (result && result.documents && result.documents.length){
+        const doc = result.documents[0];
+        // normalizedVertices: [{x,y},...]
+        const normVerts = doc.pageBoundingBox?.normalizedVertices || doc.normalizedVertices || null;
 
-      const avg = cv.mean(gray)[0];
-      cv.Canny(blur,edges,avg*0.5,avg*1.4);
+        if(normVerts){
+          drawQuadOnOverlay(normVerts);
+          setInfo('📄 Document detected');
 
-      cv.findContours(edges,contours,hier,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE);
+          // check stability (sum of distances)
+          if(lastVertices){
+            let dist=0;
+            for(let i=0;i<4;i++){
+              const pxA = { x: lastVertices[i].x*overlay.width, y: lastVertices[i].y*overlay.height };
+              const pxB = { x: normVerts[i].x*overlay.width, y: normVerts[i].y*overlay.height };
+              dist += Math.hypot(pxA.x-pxB.x, pxA.y-pxB.y);
+            }
+            if(dist < MOVE_THR) stableCount++; else stableCount=0;
+          } else stableCount=0;
 
-      octx.clearRect(0,0,w,h);
+          lastVertices = normVerts;
 
-      let best=null, areaMax=0;
-
-      for (let i=0;i<contours.size();i++){
-        const cnt=contours.get(i);
-        const peri=cv.arcLength(cnt,true);
-        const approx=new cv.Mat();
-        cv.approxPolyDP(cnt,approx,peri*0.02,true);
-
-        if (approx.rows===4){
-          const area=cv.contourArea(approx);
-          if (area>areaMax && area>w*h*0.08){
-            areaMax=area;
-            if (best) best.delete();
-            best=approx;
-          } else approx.delete();
-        } else approx.delete();
-        cnt.delete();
-      }
-
-      if (best){
-        const pts=[];
-        for(let i=0;i<4;i++){
-          pts.push({ x:best.intAt(i,0), y:best.intAt(i,1) });
+          if(stableCount>=STABLE_FRAMES && !autoBusy){
+            autoBusy=true;
+            setInfo('Stable → Auto capture');
+            await captureAndStore(true);
+            setTimeout(()=>{ autoBusy=false; }, 900);
+          }
+        } else {
+          octx.clearRect(0,0,overlay.width,overlay.height);
+          setInfo('Move closer & show the document');
+          stableCount=0;
+          lastVertices=null;
         }
-        best.delete();
-
-        lastQuad = orderQuad(pts);
-
-        octx.beginPath();
-        octx.moveTo(pts[0].x,pts[0].y);
-        octx.lineTo(pts[1].x,pts[1].y);
-        octx.lineTo(pts[2].x,pts[2].y);
-        octx.lineTo(pts[3].x,pts[3].y);
-        octx.closePath();
-        octx.lineWidth=3;
-        octx.strokeStyle="lime";
-        octx.shadowBlur=20;
-        octx.stroke();
-
-        setInfo("📄 Document detected");
-
-        const dist = quadDistance(lastQuad, prevQuad);
-        if (dist < QUAD_DISTANCE_THR) stableCount++;
-        else stableCount = 0;
-
-        prevQuad = lastQuad;
-
-        if (stableCount>=STABLE_FRAMES && !autoBusy){
-          autoBusy=true;
-          setInfo("Stable → Auto capture");
-          captureAndStore(true).finally(()=>{
-            setTimeout(()=>autoBusy=false,1500);
-          });
-        }
-
       } else {
-        lastQuad=null;
+        octx.clearRect(0,0,overlay.width,overlay.height);
+        setInfo('No document');
         stableCount=0;
-        setInfo("Move closer & show the document");
+        lastVertices=null;
       }
-
-      src.delete(); gray.delete(); blur.delete();
-      edges.delete(); contours.delete(); hier.delete();
-
-    } catch(e){ console.log(e); }
-
+    } catch(e){
+      console.error(e);
+      setInfo('Detection error');
+    }
     requestAnimationFrame(step);
   }
-
-  step();
+  requestAnimationFrame(step);
 }
 
-/* ============= CAPTURE + CROP ============= */
-document.getElementById("captureBtn").onclick = () => captureAndStore(false);
+/* -------------------------
+   Capture, perspective crop & enhancement
+   ------------------------- */
+
+captureBtn.onclick = ()=> captureAndStore(false);
 
 async function captureAndStore(isAuto){
-  if (!videoEl.videoWidth) return;
+  if(!videoEl.videoWidth) return;
+  setStatus(isAuto ? 'Auto capturing...' : 'Capturing...','yellow');
 
-  await flashBurst();
+  // Draw current frame to canvas
+  const base = document.createElement('canvas');
+  base.width = videoEl.videoWidth;
+  base.height = videoEl.videoHeight;
+  const bctx = base.getContext('2d');
+  bctx.drawImage(videoEl,0,0,base.width,base.height);
 
-  const base=document.createElement("canvas");
-  base.width=videoEl.videoWidth;
-  base.height=videoEl.videoHeight;
-  base.getContext("2d").drawImage(videoEl,0,0);
+  // If we have vertices -> do perspective transform using 2D matrix
+  // We'll implement a simple perspective warp in canvas by drawing with setTransform after mapping, using a helper.
+  let finalCanvas = document.createElement('canvas');
 
-  let final=base;
+  if(lastVertices){
+    // convert normalized verts to pixel coords in order TL, TR, BR, BL
+    const src = lastVertices.map(v => ({ x: v.x * base.width, y: v.y * base.height }));
+    // estimate width and height
+    const w1 = Math.hypot(src[1].x - src[0].x, src[1].y - src[0].y);
+    const w2 = Math.hypot(src[2].x - src[3].x, src[2].y - src[3].y);
+    const h1 = Math.hypot(src[3].x - src[0].x, src[3].y - src[0].y);
+    const h2 = Math.hypot(src[2].x - src[1].x, src[2].y - src[1].y);
+    let dstW = Math.round(Math.max(w1,w2));
+    let dstH = Math.round(Math.max(h1,h2));
+    const max = 1600;
+    const scale = Math.min(1, max / Math.max(dstW,dstH));
+    dstW = Math.round(dstW * scale);
+    dstH = Math.round(dstH * scale);
 
-  if (lastQuad && window.cv){
-    try {
-      const pts=orderQuad(lastQuad);
+    finalCanvas.width = dstW; finalCanvas.height = dstH;
 
-      const w1=Math.hypot(pts[1].x-pts[0].x,pts[1].y-pts[0].y);
-      const w2=Math.hypot(pts[2].x-pts[3].x,pts[2].y-pts[3].y);
-      const h1=Math.hypot(pts[3].x-pts[0].x,pts[3].y-pts[0].y);
-      const h2=Math.hypot(pts[2].x-pts[1].x,pts[2].y-pts[1].y);
-
-      let dstW=Math.round(Math.max(w1,w2));
-      let dstH=Math.round(Math.max(h1,h2));
-
-      const max=1600;
-      const scale=Math.min(1, max/Math.max(dstW,dstH));
-      dstW=Math.round(dstW*scale);
-      dstH=Math.round(dstH*scale);
-
-      const src=cv.imread(base);
-      const dst=new cv.Mat();
-
-      const srcTri=cv.matFromArray(4,1,cv.CV_32FC2,[
-        pts[0].x,pts[0].y,
-        pts[1].x,pts[1].y,
-        pts[2].x,pts[2].y,
-        pts[3].x,pts[3].y
-      ]);
-
-      const dstTri=cv.matFromArray(4,1,cv.CV_32FC2,[
-        0,0,
-        dstW,0,
-        dstW,dstH,
-        0,dstH
-      ]);
-
-      const M=cv.getPerspectiveTransform(srcTri,dstTri);
-      cv.warpPerspective(src,dst,M,new cv.Size(dstW,dstH));
-
-      final=document.createElement("canvas");
-      final.width=dstW;
-      final.height=dstH;
-      cv.imshow(final,dst);
-
-      src.delete(); dst.delete(); srcTri.delete(); dstTri.delete(); M.delete();
-    } catch(e){ console.log("crop fail",e); }
+    // Use canvas-based perspective transform (projective). We'll use a small helper to compute transform matrix.
+    applyPerspectiveTransform(base, finalCanvas, src, dstW, dstH);
+  } else {
+    // no vertices – just downscale copy
+    finalCanvas.width = base.width; finalCanvas.height = base.height;
+    finalCanvas.getContext('2d').drawImage(base,0,0);
   }
 
-  const blob=await new Promise(res=>final.toBlob(res,"image/jpeg",0.95));
-  const url=URL.createObjectURL(blob);
+  // Enhancement: simple auto-contrast + denoise-lite (using canvas filters)
+  await enhanceCanvas(finalCanvas);
 
-  images.push({ blob,url });
+  // convert to blob
+  const blob = await new Promise(res => finalCanvas.toBlob(res, 'image/jpeg', 0.95));
+  const url = URL.createObjectURL(blob);
+  images.push({ canvas: finalCanvas, blob, url });
   renderImages();
-
-  saveAllBtn.classList.remove("hidden");
-  setStatus(isAuto?"Auto captured":"Captured","green");
+  saveAllBtn.classList.remove('hidden');
+  setStatus(isAuto ? 'Auto captured' : 'Captured','green');
 }
 
-/* ============= PREVIEW ============= */
+/* -------------------------
+   Helper: perspective transform (projective)
+   simple implementation using triangular split
+   ------------------------- */
+function applyPerspectiveTransform(srcCanvas, dstCanvas, srcPts, dstW, dstH){
+  // split quad into two triangles and draw each mapped
+  const sctx = srcCanvas.getContext('2d');
+  const dctx = dstCanvas.getContext('2d');
+
+  // destination triangles
+  const dstPts = [ {x:0,y:0}, {x:dstW,y:0}, {x:dstW,y:dstH}, {x:0,y:dstH} ];
+
+  // helper to map triangle
+  function drawTri(srcTri, dstTri){
+    // compute affine transform matrix from srcTri -> dstTri
+    const m = computeAffineTransform(srcTri, dstTri);
+    dctx.save();
+    // set clipping to dst triangle
+    dctx.beginPath();
+    dctx.moveTo(dstTri[0].x,dstTri[0].y);
+    dctx.lineTo(dstTri[1].x,dstTri[1].y);
+    dctx.lineTo(dstTri[2].x,dstTri[2].y);
+    dctx.closePath();
+    dctx.clip();
+
+    // set transform
+    dctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
+    // draw full source canvas (transformed)
+    dctx.drawImage(srcCanvas, 0,0);
+    dctx.restore();
+  }
+
+  // Split into two triangles: (0,1,2) and (0,2,3)
+  drawTri([ srcPts[0], srcPts[1], srcPts[2] ], [ dstPts[0], dstPts[1], dstPts[2] ]);
+  drawTri([ srcPts[0], srcPts[2], srcPts[3] ], [ dstPts[0], dstPts[2], dstPts[3] ]);
+}
+
+// compute 2D affine transform from srcTri -> dstTri
+function computeAffineTransform(srcTri, dstTri){
+  // solves for matrix [a c e; b d f; 0 0 1] such that for point (x,y):
+  // x' = a*x + c*y + e
+  // y' = b*x + d*y + f
+  const x0 = srcTri[0].x, y0 = srcTri[0].y;
+  const x1 = srcTri[1].x, y1 = srcTri[1].y;
+  const x2 = srcTri[2].x, y2 = srcTri[2].y;
+  const u0 = dstTri[0].x, v0 = dstTri[0].y;
+  const u1 = dstTri[1].x, v1 = dstTri[1].y;
+  const u2 = dstTri[2].x, v2 = dstTri[2].y;
+
+  // solve linear system
+  // [ x0 y0 1 0 0 0 ] [a]   [u0]
+  // [ 0 0 0 x0 y0 1 ] [b] = [v0]
+  // etc...
+  const A = [
+    [x0, y0, 1, 0,  0,  0],
+    [0,  0,  0, x0, y0, 1],
+    [x1, y1, 1, 0,  0,  0],
+    [0,  0,  0, x1, y1, 1],
+    [x2, y2, 1, 0,  0,  0],
+    [0,  0,  0, x2, y2, 1]
+  ];
+  const B = [u0, v0, u1, v1, u2, v2];
+
+  // simple Gaussian elimination
+  const M = A.map((row,i)=> row.concat([B[i]]));
+  const n = 6;
+  for(let i=0;i<n;i++){
+    // pivot
+    let maxr=i;
+    for(let r=i+1;r<n;r++) if(Math.abs(M[r][i])>Math.abs(M[maxr][i])) maxr=r;
+    if(Math.abs(M[maxr][i])<1e-9) continue;
+    [M[i], M[maxr]] = [M[maxr], M[i]];
+    // normalize
+    const div = M[i][i];
+    for(let j=i;j<=n;j++) M[i][j]/=div;
+    // eliminate
+    for(let r=0;r<n;r++) if(r!==i){
+      const mult = M[r][i];
+      for(let c=i;c<=n;c++) M[r][c] -= mult*M[i][c];
+    }
+  }
+  const sol = M.map(row=>row[n]);
+  return { a:sol[0], b:sol[1], c:sol[2], d:sol[3], e:sol[4], f:sol[5] };
+}
+
+/* -------------------------
+   Enhancement: basic autocontrast + unsharp mask
+   ------------------------- */
+async function enhanceCanvas(canvas){
+  const ctx = canvas.getContext('2d');
+  // get image data
+  const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const data = img.data;
+  // simple auto-contrast (stretch histogram)
+  let min=255, max=0;
+  for(let i=0;i<data.length;i+=4){
+    const lum = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+    if(lum<min) min=lum;
+    if(lum>max) max=lum;
+  }
+  const range = Math.max(1, max-min);
+  for(let i=0;i<data.length;i+=4){
+    data[i] = Math.min(255, Math.max(0, (data[i]-min)*255/range ));
+    data[i+1] = Math.min(255, Math.max(0, (data[i+1]-min)*255/range ));
+    data[i+2] = Math.min(255, Math.max(0, (data[i+2]-min)*255/range ));
+  }
+  ctx.putImageData(img,0,0);
+
+  // optional: lightweight unsharp mask (convolution)
+  // We'll do simple sharpening by blending a blurred version
+  const copy = document.createElement('canvas');
+  copy.width = canvas.width; copy.height = canvas.height;
+  const cctx = copy.getContext('2d');
+  cctx.filter = 'blur(1px)';
+  cctx.drawImage(canvas,0,0);
+  const blurred = cctx.getImageData(0,0,canvas.width,canvas.height);
+  const bd = blurred.data;
+  const id = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const idd = id.data;
+  const amount = 0.6;
+  for(let i=0;i<idd.length;i+=4){
+    idd[i] = Math.min(255, idd[i] + (idd[i]-bd[i])*amount);
+    idd[i+1] = Math.min(255, idd[i+1] + (idd[i+1]-bd[i+1])*amount);
+    idd[i+2] = Math.min(255, idd[i+2] + (idd[i+2]-bd[i+2])*amount);
+  }
+  ctx.putImageData(id,0,0);
+}
+
+/* -------------------------
+   Preview rendering + deletion
+   ------------------------- */
 function renderImages(){
-  previewEl.innerHTML="";
-  images.forEach((img,i)=>{
-    previewEl.innerHTML+=`
-      <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
-        <img src="${img.url}" class="w-20 h-20 rounded-xl object-contain bg-black" />
-        <span class="text-xs opacity-70">Page ${i+1}</span>
-        <button data-i="${i}" class="ml-auto bg-red-600 px-2 py-1 rounded-full text-xs">🗑</button>
-      </div>`;
-  });
-
-  document.querySelectorAll("button[data-i]").forEach(btn=>{
-    btn.onclick=()=>{
-      const i=btn.dataset.i;
-      images.splice(i,1);
+  previewEl.innerHTML = '';
+  images.forEach((it, idx) => {
+    const block = document.createElement('div');
+    block.className = 'bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3';
+    const img = document.createElement('img');
+    img.src = it.url;
+    img.className = 'w-20 h-20 rounded-xl object-contain bg-black';
+    const span = document.createElement('span');
+    span.className = 'text-xs opacity-70';
+    span.textContent = `Page ${idx+1}`;
+    const del = document.createElement('button');
+    del.className = 'ml-auto bg-red-600 px-2 py-1 rounded-full text-xs';
+    del.textContent = '🗑';
+    del.onclick = ()=>{
+      URL.revokeObjectURL(it.url);
+      images.splice(idx,1);
       renderImages();
-      if (!images.length) saveAllBtn.classList.add("hidden");
+      if(images.length===0) saveAllBtn.classList.add('hidden');
     };
+    block.appendChild(img);
+    block.appendChild(span);
+    block.appendChild(del);
+    previewEl.appendChild(block);
   });
 }
 
-/* ============= UPLOAD ALL (DEMO) ============= */
-saveAllBtn.onclick = () => {
-  alert(`Demo: ${images.length} ta skan tayyor!`);
-  setStatus("Demo — PDF/ZIP uchun backend qo‘shiladi.","green");
-};
-</script>
+/* -------------------------
+   Save all -> generate multi-page PDF
+   ------------------------- */
+saveAllBtn.onclick = async ()=>{
+  if(images.length===0) return;
+  setStatus('Preparing PDF...','yellow');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'px', format:[images[0].canvas.width, images[0].canvas.height] });
 
+  for(let i=0;i<images.length;i++){
+    const c = images[i].canvas;
+    const dataUrl = c.toDataURL('image/jpeg', 0.95);
+    if(i>0) doc.addPage([c.width, c.height]);
+    doc.addImage(dataUrl, 'JPEG', 0,0, c.width, c.height);
+  }
+  // Save locally
+  doc.save('scans.pdf');
+  setStatus('PDF ready','green');
+};
+
+/* -------------------------
+   On unload cleanup
+   ------------------------- */
+window.addEventListener('beforeunload', ()=>{
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+});
+</script>
 </body>
 </html>
