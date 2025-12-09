@@ -1,215 +1,149 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fast Capture</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- OpenCV.js for AI -->
-    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-  </head>
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>A4 Scanner — Single Page (Tailwind)</title>
 
-  <body class="bg-slate-900 text-white min-h-screen">
-    <div class="max-w-md mx-auto p-4">
-      <h2 class="text-xl font-bold mb-4">Take Document Photo</h2>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-      <!-- START + SAVE BUTTONS -->
-      <div class="flex gap-3 mb-3">
-        <button id="startBtn"
-          class="flex-1 bg-slate-700 p-3 rounded-full active:scale-95 transition">
-          📸 Open Camera
-        </button>
+  <!-- OpenCV.js (async) -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
-        <button id="saveBtn"
-          class="flex-1 bg-blue-600 p-3 rounded-full hidden active:scale-95 transition">
-          💾 Upload All Photos
-        </button>
-      </div>
+  <style>
+    /* Minimal custom styles (Tailwind bilan birga) */
+    .video-box { aspect-ratio: 3/4; object-fit: cover; border-radius: 12px; }
+    .overlay-canvas { position: absolute; inset: 0; pointer-events: none; }
+    .focus-ring { position: absolute; width: 80px; height: 80px; border: 4px solid #fbbf24; border-radius: 9999px; display: none; pointer-events: none; transform: translate(-50%,-50%); }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-start justify-center py-8">
 
-      <p id="status" class="text-xs min-h-[20px] text-yellow-300"></p>
+  <div class="w-full max-w-md px-4">
+    <h1 class="text-2xl font-semibold mb-4">📄 A4 Scanner (Tailwind single page)</h1>
 
-      <!-- CAMERA BOX -->
-      <div id="camera-box" class="hidden mt-4 relative">
-
-        <!-- FLASH STATUS OVERLAY -->
-        <div id="flashOnScreen"
-          class="absolute top-3 right-3 bg-yellow-500 px-3 py-1 rounded-full text-xs hidden z-20">
-          🔦 Flash
-        </div>
-
-        <!-- AI / STATUS OVERLAY -->
-        <div id="infoOverlay"
-          class="absolute left-1/2 -translate-x-1/2 bottom-3 bg-slate-900/70 px-3 py-1 rounded-full text-xs z-20">
-        </div>
-
-        <!-- VIDEO STREAM -->
-        <video id="video" autoplay playsinline
-          class="w-full rounded-xl bg-black aspect-[3/4] object-cover relative z-0"></video>
-
-        <!-- AI BOUNDING BOX -->
-        <canvas id="overlay"
-          class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
-
-        <!-- ⭐ FOCUS RING (NEW) -->
-        <div id="focusRing"
-          class="absolute w-20 h-20 rounded-full border-4 border-yellow-300 hidden z-30 transition-all duration-300"
-          style="pointer-events:none;"></div>
-
-        <!-- FLASH BUTTON -->
-        <button id="flashBtn"
-          class="absolute bottom-20 right-3 bg-yellow-600 p-2 rounded-full hidden active:scale-95 transition text-sm z-20">
-          🔦
-        </button>
-
-        <!-- CAPTURE BUTTON -->
-        <button id="captureBtn"
-          class="w-full mt-3 bg-emerald-500 p-3 rounded-full active:scale-95 transition relative z-20">
-          📷 Capture Photo
-        </button>
-      </div>
-
-      <!-- PREVIEW -->
-      <h3 class="mt-6 font-bold text-sm">Received Photos</h3>
-      <div id="preview" class="space-y-2 mt-2"></div>
+    <div class="flex gap-3 mb-3">
+      <button id="startBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-full">📸 Open Camera</button>
+      <button id="saveBtn" class="flex-1 bg-blue-600 hover:bg-blue-500 py-3 rounded-full hidden">💾 Upload All</button>
     </div>
+
+    <p id="status" class="text-xs text-yellow-300 min-h-[20px] mb-2"></p>
+
+    <div id="camera-box" class="relative hidden">
+      <div id="flashOnScreen" class="absolute right-3 top-3 bg-yellow-400 text-black px-3 py-1 rounded-full text-xs hidden z-20">🔦 Flash</div>
+
+      <div id="infoOverlay" class="absolute left-1/2 -translate-x-1/2 bottom-3 bg-black/60 px-3 py-1 rounded-full text-xs z-20"></div>
+
+      <video id="video" autoplay playsinline class="w-full bg-black video-box"></video>
+
+      <canvas id="overlay" class="overlay-canvas z-10"></canvas>
+
+      <div id="focusRing" class="focus-ring z-30"></div>
+
+      <button id="flashBtn" class="absolute right-3 bottom-24 bg-yellow-400 text-black px-3 py-2 rounded-full text-sm hidden z-20">🔦</button>
+
+      <button id="captureBtn" class="w-full mt-3 bg-emerald-500 hover:bg-emerald-400 py-3 rounded-full z-20">📷 Capture Photo</button>
+    </div>
+
+    <h3 class="mt-6 font-bold text-sm">Received Photos</h3>
+    <div id="preview" class="space-y-2 mt-2"></div>
+  </div>
 
 <script>
 /* ===========================
-   URL → UID → LOCALSTORAGE
-=========================== */
-const params = new URLSearchParams(window.location.search);
-const uidFromUrl = params.get("uid");
-if (uidFromUrl) localStorage.setItem("driver_uid", uidFromUrl);
+   CONFIG
+   =========================== */
+const API_BASE = "https://panel.nvmailer.uz"; // backend base
+const CHECK_ENDPOINT = API_BASE + "/photo-check";
+const SAVE_ENDPOINT = API_BASE + "/photo-save";
 
-const DRIVER_UID = localStorage.getItem("driver_uid") || "";
-const API = "https://panel.nvmailer.uz";
-
-/* =========================== */
+/* ===========================
+   STATE
+   =========================== */
 let stream = null;
-let images = [];
 let videoTrack = null;
-let torchOn = false;
-
+let images = []; // { blob, url }
 let cvReady = false;
 let lastQuad = null;
 
-/* =========================== DOM refs */
-const statusEl = document.getElementById("status");
-const previewEl = document.getElementById("preview");
+/* ===========================
+   DOM refs
+   =========================== */
+const startBtn = document.getElementById("startBtn");
 const saveBtn = document.getElementById("saveBtn");
-const overlayCanvas = document.getElementById("overlay");
-const overlayCtx = overlayCanvas.getContext("2d");
+const statusEl = document.getElementById("status");
+const cameraBox = document.getElementById("camera-box");
+const videoEl = document.getElementById("video");
+const overlay = document.getElementById("overlay");
+const overlayCtx = overlay.getContext("2d");
 const infoOverlay = document.getElementById("infoOverlay");
 const focusRing = document.getElementById("focusRing");
+const flashBtn = document.getElementById("flashBtn");
+const flashOnScreen = document.getElementById("flashOnScreen");
+const captureBtn = document.getElementById("captureBtn");
+const previewEl = document.getElementById("preview");
 
 /* ===========================
-      OpenCV load
-=========================== */
-(function waitForCV() {
-  const check = setInterval(() => {
-    if (window.cv && cv.Mat) {
-      cv.onRuntimeInitialized = () => (cvReady = true);
-      clearInterval(check);
+   UTIL
+   =========================== */
+function setStatus(text, color="yellow") {
+  statusEl.textContent = text;
+  statusEl.className = color === "green" ? "text-green-400 text-xs" : color === "red" ? "text-red-400 text-xs" : "text-yellow-300 text-xs";
+}
+function setInfo(text="") {
+  infoOverlay.textContent = text;
+}
+
+/* ===========================
+   WAIT FOR OPENCV
+   =========================== */
+(function waitForCV(){
+  const t = setInterval(()=>{
+    if(window.cv && cv.Mat){
+      cv.onRuntimeInitialized = () => { cvReady = true; setStatus("OpenCV ready", "green"); };
+      clearInterval(t);
     }
-  }, 100);
+  }, 120);
 })();
 
 /* ===========================
-      STATUS
-=========================== */
-function setStatus(text, color="yellow") {
-  statusEl.textContent = text;
-  statusEl.className =
-    color === "green" ? "text-green-400 text-xs" :
-    color === "red"   ? "text-red-400 text-xs" :
-                        "text-yellow-300 text-xs";
-}
-
-function setInfo(text) {
-  infoOverlay.textContent = text || "";
-}
-
-/* ===========================
-   4 BURCHAK TEKSHIRISH (YANGI)
-=========================== */
-function isValidQuad(quad) {
-  if (!quad || quad.length !== 4) return false;
-
-  return quad.every(p =>
-    typeof p.x === "number" &&
-    typeof p.y === "number" &&
-    p.x > 5 &&
-    p.y > 5
-  );
-}
-
-/* ===========================
-      FLASH ON/OFF
-=========================== */
-async function toggleTorch() {
-  if (!videoTrack) return;
-  const caps = videoTrack.getCapabilities?.();
-  if (!caps?.torch) return;
-
-  torchOn = !torchOn;
-
-  try {
-    await videoTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
-  } catch {}
-}
-
-/* ===========================
-    FLASH BURST (1 sec)
-=========================== */
-async function flashBurst() {
-  if (!videoTrack) return;
-  const caps = videoTrack.getCapabilities?.();
-  if (!caps?.torch) return;
-
-  await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
-  await new Promise((res) => setTimeout(res, 600));
-  await videoTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
-}
-
-/* ===========================
    ORDER QUAD
-=========================== */
+   =========================== */
 function orderQuad(pts) {
-  const sum  = pts.map(p => p.x + p.y);
+  // return [tl, tr, br, bl]
+  const sum = pts.map(p => p.x + p.y);
   const diff = pts.map(p => p.y - p.x);
-
-  return [
-    pts[sum.indexOf(Math.min(...sum))],
-    pts[diff.indexOf(Math.min(...diff))],
-    pts[sum.indexOf(Math.max(...sum))],
-    pts[diff.indexOf(Math.max(...diff))]
-  ];
+  const tl = pts[sum.indexOf(Math.min(...sum))];
+  const br = pts[sum.indexOf(Math.max(...sum))];
+  const tr = pts[diff.indexOf(Math.min(...diff))];
+  const bl = pts[diff.indexOf(Math.max(...diff))];
+  return [tl, tr, br, bl];
+}
+function isValidQuad(quad){
+  if(!quad || quad.length !== 4) return false;
+  return quad.every(p => typeof p.x === "number" && typeof p.y === "number" && p.x > 3 && p.y > 3);
 }
 
 /* ===========================
-      AI DETECTION LOOP
-=========================== */
-function startDetectionLoop() {
-  const video = document.getElementById("video");
+   DETECTION LOOP (OpenCV)
+   =========================== */
+function startDetectionLoop(){
   const detectCanvas = document.createElement("canvas");
   const dctx = detectCanvas.getContext("2d");
 
-  function step() {
-    if (!stream) return;
-
-    if (!cvReady || !video.videoWidth) {
+  function step(){
+    if(!stream) return;
+    if(!cvReady || !videoEl.videoWidth){
       requestAnimationFrame(step);
       return;
     }
 
-    const w = video.videoWidth, h = video.videoHeight;
+    const w = videoEl.videoWidth, h = videoEl.videoHeight;
+    detectCanvas.width = w; detectCanvas.height = h;
+    overlay.width = w; overlay.height = h;
 
-    detectCanvas.width = w;
-    detectCanvas.height = h;
-    overlayCanvas.width = w;
-    overlayCanvas.height = h;
-
-    dctx.drawImage(video, 0, 0, w, h);
+    dctx.drawImage(videoEl, 0, 0, w, h);
 
     let src = cv.imread(detectCanvas);
     let gray = new cv.Mat();
@@ -221,271 +155,315 @@ function startDetectionLoop() {
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
     cv.Canny(blur, edges, 75, 200);
-
     cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
     overlayCtx.clearRect(0,0,w,h);
 
     let bestArea = 0, bestQuad = null;
+    for(let i=0;i<contours.size();i++){
+      const cnt = contours.get(i);
+      const peri = cv.arcLength(cnt, true);
+      const approx = new cv.Mat();
+      cv.approxPolyDP(cnt, approx, peri * 0.02, true);
 
-    for (let i=0;i<contours.size();i++) {
-      let cnt = contours.get(i);
-      let peri = cv.arcLength(cnt, true);
-      let approx = new cv.Mat();
-      cv.approxPolyDP(cnt, approx, peri*0.02, true);
-
-      if (approx.rows === 4) {
-        let area = cv.contourArea(approx);
-        if (area > bestArea) {
+      if(approx.rows === 4){
+        const area = cv.contourArea(approx);
+        if(area > bestArea){
           bestArea = area;
-          if (bestQuad) bestQuad.delete();
+          if(bestQuad) bestQuad.delete();
           bestQuad = approx;
         } else approx.delete();
       } else approx.delete();
-
       cnt.delete();
     }
 
-    if (bestQuad && bestArea > w*h*0.12) {
-      let pts = [];
-      for (let i=0;i<4;i++)
-        pts.push({ x: bestQuad.intAt(i,0), y: bestQuad.intAt(i,1) });
-
+    if(bestQuad && bestArea > w*h*0.12){
+      const pts = [];
+      for(let i=0;i<4;i++) pts.push({ x: bestQuad.intAt(i,0), y: bestQuad.intAt(i,1) });
       lastQuad = orderQuad(pts);
 
+      // draw polygon
       overlayCtx.beginPath();
-      overlayCtx.moveTo(lastQuad[0].x,lastQuad[0].y);
-      overlayCtx.lineTo(lastQuad[1].x,lastQuad[1].y);
-      overlayCtx.lineTo(lastQuad[2].x,lastQuad[2].y);
-      overlayCtx.lineTo(lastQuad[3].x,lastQuad[3].y);
+      overlayCtx.moveTo(lastQuad[0].x, lastQuad[0].y);
+      overlayCtx.lineTo(lastQuad[1].x, lastQuad[1].y);
+      overlayCtx.lineTo(lastQuad[2].x, lastQuad[2].y);
+      overlayCtx.lineTo(lastQuad[3].x, lastQuad[3].y);
       overlayCtx.closePath();
       overlayCtx.lineWidth = 3;
       overlayCtx.strokeStyle = "lime";
       overlayCtx.stroke();
 
-      /* === YANGI: 4 BURCHAK ANIQLANGANINI TEKSHIRISH === */
-      if (!isValidQuad(lastQuad)) {
-        setInfo("Document corners not detected clearly");
-      } else {
-        setInfo("📄 Document detected");
-      }
-
+      if(!isValidQuad(lastQuad)){
+        setInfo("Document corners not stable");
+      } else setInfo("📄 Document detected");
     } else {
       lastQuad = null;
       setInfo("Show the entire document");
     }
 
-    src.delete(); gray.delete(); blur.delete();
-    edges.delete(); contours.delete(); hierarchy.delete();
+    // free mats
+    src.delete(); gray.delete(); blur.delete(); edges.delete(); contours.delete(); hierarchy.delete();
+    if(bestQuad) bestQuad.delete();
 
     requestAnimationFrame(step);
   }
-
   step();
 }
 
 /* ===========================
-      OPEN CAMERA
-=========================== */
-document.getElementById("startBtn").onclick = async () => {
-  try {
+   CAMERA OPEN
+   =========================== */
+startBtn.addEventListener("click", async ()=>{
+  try{
     setStatus("Opening camera...");
-
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: "environment" },
         width: { ideal: 1920 },
         height: { ideal: 1080 },
-        focusMode: "continuous",
         frameRate: { ideal: 30 }
       }
     });
-
     videoTrack = stream.getVideoTracks()[0];
-
-    const caps = videoTrack.getCapabilities?.();
-    if (caps?.torch) document.getElementById("flashBtn").classList.remove("hidden");
-
-    document.getElementById("video").srcObject = stream;
-    document.getElementById("camera-box").classList.remove("hidden");
-
+    videoEl.srcObject = stream;
+    cameraBox.classList.remove("hidden");
     setStatus("Camera ready!", "green");
+
+    // show flash button if supported
+    const caps = videoTrack.getCapabilities?.();
+    if(caps && caps.torch) flashBtn.classList.remove("hidden");
+
     startDetectionLoop();
-  } catch (err) {
-    console.log(err);
-    setStatus("❌ Failed to open camera", "red");
-  }
-};
-
-/* ===========================
-      ⭐ TAP-TO-FOCUS
-=========================== */
-document.getElementById("video").addEventListener("click", async (e) => {
-  if (!videoTrack) return;
-
-  const video = document.getElementById("video");
-  const rect = video.getBoundingClientRect();
-
-  const x = (e.clientX - rect.left) / rect.width;
-  const y = (e.clientY - rect.top) / rect.height;
-
-  focusRing.style.left = (e.clientX - rect.left - 40) + "px";
-  focusRing.style.top = (e.clientY - rect.top - 40) + "px";
-  focusRing.classList.remove("hidden");
-  setTimeout(() => focusRing.classList.add("hidden"), 600);
-
-  try {
-    await videoTrack.applyConstraints({
-      advanced: [
-        {
-          focusMode: "continuous",
-          pointsOfInterest: [{ x, y }]
-        }
-      ]
-    });
-
-    setInfo("🎯 Focus detected");
-  } catch (err) {
-    console.warn("Tap-to-focus not supported:", err);
+  } catch(err){
+    console.error(err);
+    setStatus("Failed to open camera", "red");
   }
 });
 
 /* ===========================
-   CAPTURE + AUTO CROP
-=========================== */
-document.getElementById("captureBtn").onclick = async () => {
-  const video = document.getElementById("video");
-  if (!video.videoWidth) return;
+   TAP-TO-FOCUS (best-effort)
+   =========================== */
+videoEl.addEventListener("click", async (e)=>{
+  if(!videoTrack) return;
+  const rect = videoEl.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+
+  focusRing.style.left = (e.clientX - rect.left) + "px";
+  focusRing.style.top = (e.clientY - rect.top) + "px";
+  focusRing.style.display = "block";
+  setTimeout(()=> focusRing.style.display = "none", 700);
+
+  try{
+    await videoTrack.applyConstraints({
+      advanced: [{ focusMode: "continuous", pointsOfInterest: [{ x, y }] }]
+    });
+    setInfo("🎯 Focus attempted");
+  } catch(err){
+    console.warn("Tap-to-focus not supported", err);
+  }
+});
+
+/* ===========================
+   TORCH (flash) toggle
+   =========================== */
+let torchOn = false;
+async function toggleTorch(){
+  if(!videoTrack) return;
+  const caps = videoTrack.getCapabilities?.();
+  if(!caps?.torch) return;
+  torchOn = !torchOn;
+  try{ await videoTrack.applyConstraints({ advanced: [{ torch: torchOn }] }); }
+  catch(e){ console.warn("toggleTorch failed", e); }
+}
+flashBtn.addEventListener("click", async ()=> {
+  await toggleTorch();
+  flashOnScreen.style.display = torchOn ? "block" : "none";
+});
+
+/* ===========================
+   FLASH BURST (short)
+   =========================== */
+async function flashBurst(){
+  if(!videoTrack) return;
+  const caps = videoTrack.getCapabilities?.();
+  if(!caps?.torch) return;
+  try{
+    await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
+    await new Promise(r=>setTimeout(r, 600));
+    await videoTrack.applyConstraints({ advanced: [{ torch: false }] });
+  } catch(e){ /* ignore */ }
+}
+
+/* ===========================
+   CAPTURE + CROP (perspective)
+   =========================== */
+captureBtn.addEventListener("click", async ()=>{
+  if(!videoEl.videoWidth) return;
+  setStatus("Capturing...");
 
   await flashBurst();
 
+  // draw video to temp canvas
   const base = document.createElement("canvas");
-  base.width = video.videoWidth;
-  base.height = video.videoHeight;
-  base.getContext("2d").drawImage(video, 0, 0);
+  base.width = videoEl.videoWidth;
+  base.height = videoEl.videoHeight;
+  const bctx = base.getContext("2d");
+  bctx.drawImage(videoEl, 0, 0, base.width, base.height);
 
   let finalCanvas = base;
 
-  if (cvReady && lastQuad) {
-    try {
+  if(cvReady && lastQuad && isValidQuad(lastQuad)){
+    try{
       const pts = lastQuad;
       const w1 = Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
       const w2 = Math.hypot(pts[2].x-pts[3].x, pts[2].y-pts[3].y);
       const h1 = Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y);
       const h2 = Math.hypot(pts[2].x-pts[1].x, pts[2].y-pts[1].y);
+      const dstW = Math.max(Math.floor(w1), Math.floor(w2));
+      const dstH = Math.max(Math.floor(h1), Math.floor(h2));
 
-      const dstW = Math.max(w1, w2);
-      const dstH = Math.max(h1, h2);
-
+      // OpenCV perspective transform
       const src = cv.imread(base);
       const dst = new cv.Mat();
-
       const srcTri = cv.matFromArray(4,1,cv.CV_32FC2,[
-        pts[0].x,pts[0].y,
-        pts[1].x,pts[1].y,
-        pts[2].x,pts[2].y,
-        pts[3].x,pts[3].y
+        pts[0].x, pts[0].y,
+        pts[1].x, pts[1].y,
+        pts[2].x, pts[2].y,
+        pts[3].x, pts[3].y
       ]);
-
       const dstTri = cv.matFromArray(4,1,cv.CV_32FC2,[
         0,0,
         dstW,0,
         dstW,dstH,
         0,dstH
       ]);
-
-      const M = cv.getPerspectiveTransform(srcTri,dstTri);
-
-      cv.warpPerspective(src,dst,M,new cv.Size(dstW,dstH));
+      const M = cv.getPerspectiveTransform(srcTri, dstTri);
+      cv.warpPerspective(src, dst, M, new cv.Size(dstW, dstH));
 
       finalCanvas = document.createElement("canvas");
-      finalCanvas.width = dstW;
-      finalCanvas.height = dstH;
-
+      finalCanvas.width = dstW; finalCanvas.height = dstH;
       cv.imshow(finalCanvas, dst);
 
+      // free mats
       src.delete(); dst.delete(); srcTri.delete(); dstTri.delete(); M.delete();
-    } catch (err) { console.log(err); }
+    } catch(e){
+      console.error("Crop failed", e);
+    }
   }
 
-  const blob = await new Promise(res =>
-    finalCanvas.toBlob(res, "image/jpeg", 0.95)
-  );
+  // to blob
+  const blob = await new Promise(res => finalCanvas.toBlob(res, "image/jpeg", 0.95));
+  if(!blob) { setStatus("Capture failed", "red"); return; }
 
+  // Optional: send to /photo-check
   const form = new FormData();
   form.append("photo", blob);
-  form.append("uid", DRIVER_UID);
+  // if you have uid in localStorage or query param, append
+  const uid = localStorage.getItem("driver_uid") || new URLSearchParams(location.search).get("uid") || "";
+  form.append("uid", uid);
 
-  const resp = await fetch(`${API}/photo-check`, {
-    method: "POST",
-    body: form
-  });
-
-  const data = await resp.json();
-  if (!data.ok) {
-    setStatus(data.msg, "red");
-    return;
+  setStatus("Sending to server for quick-check...");
+  try{
+    const resp = await fetch(CHECK_ENDPOINT, { method: "POST", body: form });
+    const data = await resp.json();
+    if(!data.ok){
+      setStatus(data.msg || "Server rejected photo", "red");
+      return;
+    }
+  } catch(e){
+    console.warn("photo-check failed, continuing locally", e);
+    // proceed anyway
   }
 
   const url = URL.createObjectURL(blob);
   images.push({ blob, url });
-  renderImages();
+  renderPreview();
   saveBtn.classList.remove("hidden");
-  setStatus("Photo received!", "green");
-};
+  setStatus("Photo captured", "green");
+});
 
 /* ===========================
-      PREVIEW RENDER
-=========================== */
-function renderImages() {
+   PREVIEW RENDER
+   =========================== */
+function renderPreview(){
   previewEl.innerHTML = "";
-  images.forEach((img, i) => {
-    previewEl.innerHTML += `
-      <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3">
-        <img src="${img.url}" class="w-20 h-20 rounded-lg object-cover" />
-        <button data-i="${i}"
-          class="ml-auto px-2 py-1 bg-red-600 rounded-full text-xs">
-          🗑 Delete
-        </button>
-      </div>`;
-  });
+  images.forEach((it, idx)=>{
+    const wrapper = document.createElement("div");
+    wrapper.className = "bg-slate-800 p-2 rounded-xl border border-slate-700 flex items-center gap-3";
 
-  document.querySelectorAll("button[data-i]").forEach(btn=>{
-    btn.onclick=()=>{
-      images.splice(btn.dataset.i,1);
-      renderImages();
-      if(images.length===0) saveBtn.classList.add("hidden");
+    const img = document.createElement("img");
+    img.src = it.url;
+    img.className = "w-20 h-20 rounded-lg object-cover";
+    wrapper.appendChild(img);
+
+    const del = document.createElement("button");
+    del.className = "ml-auto px-2 py-1 bg-red-600 rounded-full text-xs";
+    del.textContent = "🗑 Delete";
+    del.onclick = ()=> {
+      images.splice(idx,1);
+      renderPreview();
+      if(images.length === 0) saveBtn.classList.add("hidden");
     };
+    wrapper.appendChild(del);
+    previewEl.appendChild(wrapper);
   });
 }
 
 /* ===========================
-   SAVE ALL
-=========================== */
-saveBtn.onclick = async () => {
-  if(images.length===0) return;
-
+   SAVE ALL (upload)
+   =========================== */
+saveBtn.addEventListener("click", async () => {
+  if(images.length === 0) return;
+  setStatus("Uploading all photos...");
+  const uid = localStorage.getItem("driver_uid") || new URLSearchParams(location.search).get("uid") || "";
   const form = new FormData();
-  images.forEach((img,i)=>{
-    form.append("photos",img.blob,`photo_${i}.jpg`);
-  });
-  form.append("uid",DRIVER_UID);
+  images.forEach((it, i) => form.append("photos", it.blob, `photo_${i}.jpg`));
+  form.append("uid", uid);
 
-  const resp = await fetch(`${API}/photo-save`,{
-    method:"POST",
-    body:form
-  });
+  try{
+    const resp = await fetch(SAVE_ENDPOINT, { method: "POST", body: form });
+    const data = await resp.json();
+    if(data.ok){
+      images = [];
+      renderPreview();
+      saveBtn.classList.add("hidden");
+      setStatus("All photos uploaded!", "green");
+    } else {
+      setStatus(data.msg || "Upload failed", "red");
+    }
+  } catch(e){
+    console.error(e);
+    setStatus("Upload error", "red");
+  }
+});
 
-  const data = await resp.json();
-  if(data.ok){
-    images = [];
-    renderImages();
-    saveBtn.classList.add("hidden");
-    setStatus("All photos uploaded!","green");
-  } else setStatus("An error occurred","red");
-};
+/* ===========================
+   OPTIONAL: auto-capture when stable detection found
+   (simple 5-frame stability check)
+   =========================== */
+let stableFrames = 0;
+setInterval(()=>{
+  if(!lastQuad) { stableFrames = 0; return; }
+  // If quad exists and area reasonable, increment
+  stableFrames++;
+  if(stableFrames >= 5){
+    // auto-capture once (but avoid repeated triggers)
+    stableFrames = 0;
+    // optionally auto trigger capture:
+    // captureBtn.click();
+    // COMMENTED: leave manual capture as primary; uncomment to enable auto-capture
+  }
+}, 200);
+
+/* ===========================
+   CLEANUP on unload
+   =========================== */
+window.addEventListener("beforeunload", ()=>{
+  if(stream) {
+    stream.getTracks().forEach(t => t.stop());
+  }
+});
 </script>
-
-
 </body>
 </html>
