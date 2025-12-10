@@ -3,23 +3,25 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>iOS-Style A4 Scanner — Improved</title>
+  <title>iOS-Style A4 Scanner — Full Clone (Wood-safe)</title>
 
-  <!-- Tailwind -->
+  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- OpenCV.js -->
+
+  <!-- OpenCV.js (WASM) -->
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
   <style>
+    body { -webkit-font-smoothing:antialiased; }
     .video-box { aspect-ratio: 3/4; object-fit: cover; border-radius: 12px; }
     .overlay-canvas { position: absolute; inset: 0; pointer-events: none; }
     .focus-ring { position: absolute; width: 80px; height: 80px; border: 4px solid #fbbf24; border-radius: 9999px; display: none; pointer-events: none; transform: translate(-50%,-50%); }
   </style>
 </head>
-
 <body class="bg-slate-900 text-white min-h-screen flex justify-center py-8">
+
   <div class="w-full max-w-md px-4">
-    <h1 class="text-xl font-semibold mb-3">📄 iOS-Style A4 Scanner — Optimized</h1>
+    <h1 class="text-xl font-semibold mb-3">📄 iOS-Style A4 Scanner — Wood-safe Full</h1>
 
     <div class="flex gap-3 mb-3">
       <button id="startBtn" class="flex-1 bg-slate-700 py-3 rounded-full">📸 Open Camera</button>
@@ -46,16 +48,20 @@
 
 <script>
 /* =========================
-   CONFIG / STATE
+   Full iOS-style scanner
+   - Improved for wood/textured backgrounds
+   - Auto-capture, smoothing, CLAHE enhance, upload
    ========================= */
-const API_BASE = "https://panel.nvmailer.uz";
-const CHECK_ENDPOINT = API_BASE + "/photo-check";
+
+/* CONFIG */
+const API_BASE = "https://panel.nvmailer.uz"; // change if needed
 const SAVE_ENDPOINT = API_BASE + "/photo-save";
 
+/* STATE */
 let stream = null;
 let videoTrack = null;
 let cvReady = false;
-let rawQuad = null, lastQuad = null;
+let lastQuad = null;    // smoothed quad in full-resolution coords
 let quadHistory = [];
 const QUAD_HISTORY_LEN = 6;
 let stableFrames = 0;
@@ -76,7 +82,8 @@ const captureBtn = document.getElementById("captureBtn");
 const saveBtn = document.getElementById("saveBtn");
 const previewEl = document.getElementById("preview");
 
-function setStatus(t,c="yellow"){ statusEl.textContent=t; statusEl.className = c==="green"?"text-green-400 text-xs":c==="red"?"text-red-400 text-xs":"text-yellow-300 text-xs"; }
+/* HELPERS */
+function setStatus(t,c="yellow"){ statusEl.textContent=t; statusEl.className = c==="green"?"text-green-400 text-xs": c==="red"?"text-red-400 text-xs":"text-yellow-300 text-xs"; }
 function setInfo(t=""){ infoOverlay.textContent = t; }
 
 function orderQuad(pts){
@@ -88,16 +95,17 @@ function orderQuad(pts){
   const bl = pts[diff.indexOf(Math.max(...diff))];
   return [tl,tr,br,bl];
 }
-function isValidQuad(q){ return q && q.length===4 && q.every(p=>p.x>2 && p.y>2); }
+function isValidQuad(q){ return q && q.length===4 && q.every(p=>Number.isFinite(p.x) && Number.isFinite(p.y)); }
 
-function smoothQuad(newQ){
-  if(!isValidQuad(newQ)) return null;
-  quadHistory.push(newQ);
+/* smoothing history */
+function pushQuad(q){
+  if(!isValidQuad(q)) return null;
+  quadHistory.push(q.map(p=>({x:p.x,y:p.y})));
   if(quadHistory.length > QUAD_HISTORY_LEN) quadHistory.shift();
   const n = quadHistory.length;
   const avg = [{x:0,y:0},{x:0,y:0},{x:0,y:0},{x:0,y:0}];
-  quadHistory.forEach(q=>{
-    for(let i=0;i<4;i++){ avg[i].x += q[i].x; avg[i].y += q[i].y; }
+  quadHistory.forEach(Q=>{
+    for(let i=0;i<4;i++){ avg[i].x += Q[i].x; avg[i].y += Q[i].y; }
   });
   for(let i=0;i<4;i++){ avg[i].x /= n; avg[i].y /= n; }
   return avg;
@@ -108,15 +116,9 @@ function quadMotion(a,b){
   return s/4;
 }
 
-/* luminance */
+/* luminance quick */
 function meanLuminanceFromCanvas(c){
-  try {
-    const ctx = c.getContext('2d');
-    const d = ctx.getImageData(0,0,c.width,c.height).data;
-    let s=0,n=0;
-    for(let i=0;i<d.length;i+=4){ s += 0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2]; n++; }
-    return s/n;
-  } catch(e){ return 120; }
+  try{ const ctx=c.getContext('2d'); const d = ctx.getImageData(0,0,c.width,c.height).data; let s=0,n=0; for(let i=0;i<d.length;i+=4){ s += 0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2]; n++; } return s/n; }catch(e){ return 120; }
 }
 
 /* beep */
@@ -132,160 +134,211 @@ function beep(){ try{ const ctx = new (window.AudioContext||window.webkitAudioCo
   },120);
 })();
 
+/* DRAW highlight (iPhone-like) */
+function drawHighlight(pts){
+  const w = overlay.width, h = overlay.height;
+  overlayCtx.clearRect(0,0,w,h);
+
+  // dark overlay
+  overlayCtx.fillStyle = "rgba(0,0,0,0.55)";
+  overlayCtx.fillRect(0,0,w,h);
+
+  // cut-out polygon
+  overlayCtx.save();
+  overlayCtx.beginPath();
+  overlayCtx.moveTo(pts[0].x, pts[0].y);
+  overlayCtx.lineTo(pts[1].x, pts[1].y);
+  overlayCtx.lineTo(pts[2].x, pts[2].y);
+  overlayCtx.lineTo(pts[3].x, pts[3].y);
+  overlayCtx.closePath();
+  overlayCtx.globalCompositeOperation = "destination-out";
+  overlayCtx.fill();
+  overlayCtx.restore();
+
+  // yellow fill
+  overlayCtx.fillStyle = "rgba(255,220,0,0.34)";
+  overlayCtx.beginPath();
+  overlayCtx.moveTo(pts[0].x, pts[0].y);
+  overlayCtx.lineTo(pts[1].x, pts[1].y);
+  overlayCtx.lineTo(pts[2].x, pts[2].y);
+  overlayCtx.lineTo(pts[3].x, pts[3].y);
+  overlayCtx.closePath();
+  overlayCtx.fill();
+
+  // glow border
+  overlayCtx.lineWidth = Math.max(3, Math.round(Math.min(w,h)*0.003));
+  overlayCtx.strokeStyle = "rgba(255,200,0,0.28)";
+  overlayCtx.stroke();
+  overlayCtx.lineWidth = Math.max(2, Math.round(Math.min(w,h)*0.0016));
+  overlayCtx.strokeStyle = "rgb(255,200,0)";
+  overlayCtx.beginPath();
+  overlayCtx.moveTo(pts[0].x, pts[0].y);
+  overlayCtx.lineTo(pts[1].x, pts[1].y);
+  overlayCtx.lineTo(pts[2].x, pts[2].y);
+  overlayCtx.lineTo(pts[3].x, pts[3].y);
+  overlayCtx.closePath();
+  overlayCtx.stroke();
+}
+
 /* =========================
-   DETECTION (optimized)
-   - process smaller frame (scaleDown) for speed
-   - map coordinates back
-   - morphological cleaning + contour approx
+   SUPER DETECTION (wood-safe)
+   - downsample for speed
+   - normalize, remove wood texture, heavy closing
+   - multi-criteria scoring
    ========================= */
 function startDetectionLoop(){
-  const detectCanvas = document.createElement("canvas");
-  const dctx = detectCanvas.getContext("2d");
+  const procMax = 720; // tuned for mobile perf
+  const detectCanvas = document.createElement('canvas');
+  const dctx = detectCanvas.getContext('2d');
 
-  const minAreaRatio = 0.05;     // oldingi 0.12 juda yuqori edi
-  const targetA4 = 1.0;          // aspect ratio penalty
-  const A4ratio = 1.414;         // A4 proportion
+  // previous smoothed for motion calc
+  let prevSmooth = null;
 
-  function step(){
-    if(!stream){ requestAnimationFrame(step); return; }
-    if(!cvReady || !videoEl.videoWidth){
-      requestAnimationFrame(step); return;
-    }
+  async function step(){
+    if(!stream) return requestAnimationFrame(step);
+    if(!cvReady || !videoEl.videoWidth) return requestAnimationFrame(step);
 
-    const vw = videoEl.videoWidth;
-    const vh = videoEl.videoHeight;
-    const scale = 600 / Math.max(vw, vh);
+    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+    overlay.width = vw; overlay.height = vh;
 
-    const pw = Math.floor(vw * scale);
-    const ph = Math.floor(vh * scale);
+    // compute downscale to speed
+    const scale = Math.min(1, procMax / Math.max(vw, vh));
+    const pw = Math.max(320, Math.floor(vw * scale));
+    const ph = Math.max(320, Math.floor(vh * scale));
+    detectCanvas.width = pw; detectCanvas.height = ph;
 
-    detectCanvas.width = pw;
-    detectCanvas.height = ph;
-    overlay.width = vw;
-    overlay.height = vh;
-
-    // draw scaled video
     dctx.drawImage(videoEl, 0, 0, pw, ph);
 
-    /* --- OPENCV START --- */
+    // OpenCV processing on detectCanvas (smaller)
     let src = cv.imread(detectCanvas);
     let gray = new cv.Mat();
+    let norm = new cv.Mat();
     let blur = new cv.Mat();
     let edges = new cv.Mat();
-    let dil = new cv.Mat();
-    let close = new cv.Mat();
+    let closed = new cv.Mat();
     let contours = new cv.MatVector();
     let hierarchy = new cv.Mat();
 
-    // preprocess
+    // 1. Grayscale + equalize to normalize brightness (helps wood)
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
+    try { cv.equalizeHist(gray, norm); } catch(e){ norm = gray.clone(); }
 
-    // Canny is best for iPhone-like scanner
-    cv.Canny(blur, edges, 60, 160);
+    // 2. Bilateral filter to remove texture but keep edges (wood desk handling)
+    let smooth = new cv.Mat();
+    cv.bilateralFilter(norm, smooth, 9, 75, 75);
 
-    // strengthen edges
-    const kernel = cv.Mat.ones(5,5,cv.CV_8U);
-    cv.dilate(edges, dil, kernel);
-    cv.morphologyEx(dil, close, cv.MORPH_CLOSE, kernel);
+    // 3. Slight Gaussian to remove noise
+    cv.GaussianBlur(smooth, blur, new cv.Size(5,5), 1.2);
 
-    cv.findContours(close, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    // 4. Edge detection (Canny) with conservative thresholds
+    cv.Canny(blur, edges, 20, 100);
 
-    let bestQuad = null;
+    // 5. Morphology: dilate + close to join fragmented edges
+    let kernel = cv.Mat.ones(7,7,cv.CV_8U);
+    cv.dilate(edges, edges, kernel);
+    cv.morphologyEx(edges, closed, cv.MORPH_CLOSE, kernel);
+
+    // 6. find contours
+    cv.findContours(closed, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+    // prepare overlay
+    overlayCtx.clearRect(0,0,overlay.width,overlay.height);
+
+    // scoring params
+    const MIN_AREA_RATIO = 0.045;  // allow smaller A4 if camera is far
+    const A4_RATIO = 1.414;
     let bestScore = 0;
+    let bestApprox = null;
 
-    for (let i = 0; i < contours.size(); i++){
-      let cnt = contours.get(i);
-      let peri = cv.arcLength(cnt, true);
-      let approx = new cv.Mat();
+    for(let i=0;i<contours.size();i++){
+      const cnt = contours.get(i);
+      const peri = cv.arcLength(cnt, true);
+      const approx = new cv.Mat();
       cv.approxPolyDP(cnt, approx, peri * 0.018, true);
 
       if(approx.rows === 4){
-        let area = cv.contourArea(approx);
-        let areaRatio = area / (pw * ph);
-        if(areaRatio < minAreaRatio){
-          approx.delete(); continue;
-        }
+        const area = Math.abs(cv.contourArea(approx));
+        const areaRatio = area / (pw * ph);
+        if(areaRatio < MIN_AREA_RATIO){ approx.delete(); cnt.delete(); continue; }
 
-        // Calculate aspect ratio score
+        // get pts and order them
         let pts = [];
-        for(let j=0;j<4;j++)
-          pts.push({x: approx.intAt(j,0), y: approx.intAt(j,1)});
+        for(let j=0;j<4;j++) pts.push({ x: approx.intAt(j,0), y: approx.intAt(j,1) });
+        pts = orderQuad(pts);
 
-        let o = orderQuad(pts);
-        let w1 = Math.hypot(o[1].x-o[0].x, o[1].y-o[0].y);
-        let h1 = Math.hypot(o[3].x-o[0].x, o[3].y-o[0].y);
-        let ratio = Math.max(w1,h1) / Math.min(w1,h1);
-        let ratioScore = 1 - Math.abs(ratio - A4ratio) * 0.4; // closer to A4 ratio, better
+        // aspect ratio score
+        const w = Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+        const h = Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y);
+        const ratio = Math.max(w,h) / Math.min(w,h);
+        const ratioScore = Math.max(0, 1 - Math.abs(ratio - A4_RATIO) * 0.6);
 
-        let final = areaRatio + ratioScore;
-        if(final > bestScore){
-          bestScore = final;
-          if(bestQuad) bestQuad.delete();
-          bestQuad = approx;
+        // solidity / rectangularity: compare contour area vs bounding box
+        const bboxArea = (Math.max(pts[1].x,pts[2].x) - Math.min(pts[0].x,pts[3].x)) * (Math.max(pts[2].y,pts[3].y) - Math.min(pts[0].y,pts[1].y));
+        const solidity = bboxArea > 0 ? area / bboxArea : 0;
+
+        // final score (weighted)
+        const score = areaRatio * 1.2 + ratioScore * 0.9 + solidity * 0.8;
+
+        if(score > bestScore){
+          bestScore = score;
+          if(bestApprox) bestApprox.delete();
+          bestApprox = approx;
         } else approx.delete();
       } else approx.delete();
 
       cnt.delete();
     }
 
-    overlayCtx.clearRect(0,0,vw,vh);
-
-    if(bestQuad){
-      // map coords back to full-resolution video
-      const sx = vw / pw;
-      const sy = vh / ph;
+    if(bestApprox){
+      // map points back to original resolution
+      const sx = vw / pw, sy = vh / ph;
       let pts = [];
-      for(let i=0;i<4;i++)
-        pts.push({
-          x: bestQuad.intAt(i,0) * sx,
-          y: bestQuad.intAt(i,1) * sy
-        });
-
+      for(let k=0;k<4;k++) pts.push({ x: bestApprox.intAt(k,0)*sx, y: bestApprox.intAt(k,1)*sy });
       pts = orderQuad(pts);
-      lastQuad = pts;
 
-      /* --- SARIQ HIGHLIGHT --- */
-      overlayCtx.fillStyle = "rgba(0,0,0,0.55)";
-      overlayCtx.fillRect(0,0,vw,vh);
+      // smoothing with history
+      const sm = pushQuad(pts);
+      if(sm) lastQuad = sm;
 
-      overlayCtx.save();
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(pts[0].x, pts[0].y);
-      overlayCtx.lineTo(pts[1].x, pts[1].y);
-      overlayCtx.lineTo(pts[2].x, pts[2].y);
-      overlayCtx.lineTo(pts[3].x, pts[3].y);
-      overlayCtx.closePath();
+      // draw highlight (smoothed)
+      if(lastQuad) drawHighlight(lastQuad);
 
-      overlayCtx.globalCompositeOperation = "destination-out";
-      overlayCtx.fill();
-      overlayCtx.restore();
+      setInfo("📄 Hujjat topildi — barqaror joylang");
 
-      overlayCtx.fillStyle = "rgba(255,220,0,0.35)";
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(pts[0].x, pts[0].y);
-      overlayCtx.lineTo(pts[1].x, pts[1].y);
-      overlayCtx.lineTo(pts[2].x, pts[2].y);
-      overlayCtx.lineTo(pts[3].x, pts[3].y);
-      overlayCtx.closePath();
-      overlayCtx.fill();
+      // auto-capture checks: area + motion + brightness
+      const areaRatioFull = Math.abs(cv.contourArea(bestApprox)) / (pw*ph);
+      const brightness = meanLuminanceFromCanvas(detectCanvas); // 0-255
+      const motion = prevSmooth ? quadMotion(lastQuad, prevSmooth) : 9999;
+      const goodArea = areaRatioFull > 0.28;
+      const lowMotion = motion < Math.max(vw,vh) * 0.007;
+      const goodLight = brightness > 38;
 
-      overlayCtx.lineWidth = 4;
-      overlayCtx.strokeStyle = "rgb(255,200,0)";
-      overlayCtx.stroke();
+      if(goodArea && lowMotion && goodLight && autoCapture){
+        stableFrames++;
+      } else stableFrames = Math.max(0, stableFrames - 1);
 
-      setInfo("📄 Hujjat topildi");
+      if(stableFrames >= 6 && (Date.now() - lastCaptureAt) > 1200){
+        stableFrames = 0;
+        lastCaptureAt = Date.now();
+        beep();
+        triggerCapture(true);
+      }
 
+      prevSmooth = lastQuad;
     } else {
+      // no candidate
+      quadHistory = [];
       lastQuad = null;
-      setInfo("Hujjatni kadrga joylashtiring");
+      stableFrames = 0;
+      setInfo("Hujjatni to‘liq kadrga joylashtiring");
     }
 
     // cleanup
-    src.delete(); gray.delete(); blur.delete();
-    edges.delete(); dil.delete(); close.delete();
+    src.delete(); gray.delete(); norm.delete(); blur.delete(); edges.delete(); closed.delete();
     contours.delete(); hierarchy.delete();
-    if(bestQuad) bestQuad.delete();
+    if(bestApprox) bestApprox.delete();
+    if(typeof kernel !== 'undefined') kernel.delete();
+    if(typeof smooth !== 'undefined') smooth.delete();
 
     requestAnimationFrame(step);
   }
@@ -310,24 +363,30 @@ startBtn.addEventListener("click", async ()=>{
     startDetectionLoop();
   } catch(e){
     console.error(e);
-    setStatus("Kamera ochilmadi", "red");
+    setStatus("Kamera ochilmadi: " + (e.message||e), "red");
   }
 });
 
 /* =========================
-   CAPTURE + ENHANCE (same as earlier)
+   CAPTURE & ENHANCE
+   - perspective warp using lastQuad
+   - CLAHE + bilateral + unsharp (safe fallback)
    ========================= */
 async function triggerCapture(autoFlag=false){
   if(!videoEl.videoWidth) return;
-  setStatus(autoFlag ? "Auto-capturing..." : "Capturing...");
+  setStatus(autoFlag ? "Auto-capture..." : "Capturing...");
+
+  // capture full frame
   const base = document.createElement('canvas');
   base.width = videoEl.videoWidth; base.height = videoEl.videoHeight;
   base.getContext('2d').drawImage(videoEl, 0, 0, base.width, base.height);
 
   let finalCanvas = base;
+
   if(cvReady && lastQuad && isValidQuad(lastQuad)){
     try{
       const pts = lastQuad;
+      // compute dst dims
       const w1 = Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
       const w2 = Math.hypot(pts[2].x-pts[3].x, pts[2].y-pts[3].y);
       const h1 = Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y);
@@ -335,47 +394,64 @@ async function triggerCapture(autoFlag=false){
       const dstW = Math.max(Math.floor(w1), Math.floor(w2));
       const dstH = Math.max(Math.floor(h1), Math.floor(h2));
 
+      // warp using OpenCV
       const src = cv.imread(base);
       const dst = new cv.Mat();
-      const srcTri = cv.matFromArray(4,1,cv.CV_32FC2,[pts[0].x,pts[0].y, pts[1].x,pts[1].y, pts[2].x,pts[2].y, pts[3].x,pts[3].y]);
+      const srcTri = cv.matFromArray(4,1,cv.CV_32FC2,[
+        pts[0].x, pts[0].y, pts[1].x, pts[1].y,
+        pts[2].x, pts[2].y, pts[3].x, pts[3].y
+      ]);
       const dstTri = cv.matFromArray(4,1,cv.CV_32FC2,[0,0, dstW,0, dstW,dstH, 0,dstH]);
-      const M = cv.getPerspectiveTransform(srcTri,dstTri);
-      cv.warpPerspective(src,dst,M,new cv.Size(dstW,dstH));
+      const M = cv.getPerspectiveTransform(srcTri, dstTri);
+      cv.warpPerspective(src, dst, M, new cv.Size(dstW, dstH));
 
-      // image enhance attempt (safe fallbacks)
+      // image enhance (CLAHE + bilateral + unsharp)
       try{
         let lab = new cv.Mat();
         cv.cvtColor(dst, lab, cv.COLOR_RGBA2Lab);
         let planes = new cv.MatVector(); cv.split(lab, planes);
         let L = planes.get(0);
+
+        // CLAHE
         let clahe = new cv.CLAHE(2.0, new cv.Size(8,8));
         let Lc = new cv.Mat();
         clahe.apply(L, Lc);
+
         planes.set(0, Lc);
         cv.merge(planes, lab);
         let enhanced = new cv.Mat();
         cv.cvtColor(lab, enhanced, cv.COLOR_Lab2RGBA);
-        let smooth = new cv.Mat();
-        cv.bilateralFilter(enhanced, smooth, 9, 75, 75);
+
+        // bilateral filter (noise removal)
+        let smooth2 = new cv.Mat();
+        cv.bilateralFilter(enhanced, smooth2, 9, 75, 75);
+
+        // unsharp (sharpen)
         let sharpen = new cv.Mat();
-        cv.addWeighted(enhanced, 1.5, smooth, -0.5, 0, sharpen);
-        finalCanvas = document.createElement('canvas'); finalCanvas.width = sharpen.cols; finalCanvas.height = sharpen.rows;
+        cv.addWeighted(enhanced, 1.5, smooth2, -0.5, 0, sharpen);
+
+        finalCanvas = document.createElement('canvas');
+        finalCanvas.width = sharpen.cols; finalCanvas.height = sharpen.rows;
         cv.imshow(finalCanvas, sharpen);
+
         // cleanup
         L.delete(); Lc.delete(); planes.delete(); lab.delete();
-        clahe.delete(); enhanced.delete(); smooth.delete(); sharpen.delete();
+        clahe.delete(); enhanced.delete(); smooth2.delete(); sharpen.delete();
       } catch(e){
-        finalCanvas = document.createElement('canvas'); finalCanvas.width = dst.cols; finalCanvas.height = dst.rows;
+        // fallback: use warp result
+        finalCanvas = document.createElement('canvas');
+        finalCanvas.width = dst.cols; finalCanvas.height = dst.rows;
         cv.imshow(finalCanvas, dst);
       }
 
       src.delete(); dst.delete(); srcTri.delete(); dstTri.delete(); M.delete();
     } catch(e){
-      console.error("Warp error", e);
+      console.error("Warp/enhance error:", e);
       finalCanvas = base;
     }
   }
 
+  // convert to blob and preview/save
   const blob = await new Promise(res => finalCanvas.toBlob(res, "image/jpeg", 0.92));
   if(!blob){ setStatus("Capture failed", "red"); return; }
 
@@ -407,7 +483,7 @@ function renderPreview(){
   });
 }
 
-/* save all to server */
+/* Upload all */
 saveBtn.addEventListener("click", async ()=>{
   if(images.length===0) return;
   setStatus("Uploading...");
@@ -422,10 +498,10 @@ saveBtn.addEventListener("click", async ()=>{
   } catch(e){ console.error(e); setStatus("Upload error", "red"); }
 });
 
-/* toggle auto */
+/* Toggle auto-capture */
 toggleAuto.addEventListener("click", ()=> { autoCapture = !autoCapture; toggleAuto.textContent = `⚙️ Auto: ${autoCapture ? "ON":"OFF"}`; });
 
-/* cleanup */
+/* Cleanup */
 window.addEventListener("beforeunload", ()=> { if(stream) stream.getTracks().forEach(t=>t.stop()); });
 
 </script>
