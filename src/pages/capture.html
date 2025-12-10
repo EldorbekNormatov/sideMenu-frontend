@@ -3,147 +3,117 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>iOS-Style Document Scanner — UI/UX Clone</title>
+  <title>iPhone-like Document Scanner — Auto Scan + Upload</title>
 
-  <!-- Permissions policy helps some WebViews / browsers allow camera -->
-  <meta http-equiv="Permissions-Policy" content="camera=(self)">
-
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- OpenCV.js -->
+  <!-- OpenCV.js (async) -->
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
   <style>
     :root{
-      --bg:#081126;
-      --panel:#0f1724;
-      --accent:#10b981;
-      --muted:#94a3b8;
-      --iphone-notch-height:34px;
+      --bg:#071027;
+      --panel:#061222;
+      --accent:#ffd23f;
+      --muted:#9aa7ba;
     }
-    html,body { height:100%; margin:0; background:var(--bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial; -webkit-font-smoothing:antialiased; color:#fff; }
-    .safe-area { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-    /* Camera box */
-    .camera-shell { max-width:420px; margin: 14px auto; background:linear-gradient(180deg,#071027 0%, #07182e 100%); border-radius:18px; padding:12px; box-shadow: 0 6px 30px rgba(0,0,0,0.6); }
-    .video-box { width:100%; aspect-ratio: 9/16; background:#000; border-radius:12px; overflow:hidden; position:relative; }
-    .overlay-canvas { position:absolute; inset:0; pointer-events:none; }
-    .topbar { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 8px; }
-    .pill { background:rgba(255,255,255,0.06); padding:8px 12px; border-radius:999px; display:inline-flex; gap:8px; align-items:center; font-size:13px; color:var(--muted); }
-    .top-left { display:flex; gap:8px; align-items:center; }
-    .notch { height: var(--iphone-notch-height); display:block; width:100%; }
-    /* bottom controls */
-    .controls { display:flex; gap:12px; padding:10px 6px; align-items:center; justify-content:center; }
-    .shutter { width:78px; height:78px; border-radius:50%; display:flex; align-items:center; justify-content:center; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), rgba(255,255,255,0.02)); border:6px solid rgba(255,255,255,0.12); box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
-    .shutter-inner { width:58px; height:58px; border-radius:50%; background: #fff; transform: scale(1); display:block; }
-    .shutter-auto { border-color: rgba(16,185,129,0.9); }
-    .small-btn { background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:10px; font-size:13px; color:var(--muted); display:inline-flex; gap:8px; align-items:center; }
-    /* preview area */
-    .preview-list { margin-top:12px; display:flex; flex-direction:column; gap:10px; }
-    .preview-card { background: #071029; border-radius:12px; padding:10px; display:flex; gap:10px; align-items:center; }
-    .filter-chip { background:rgba(255,255,255,0.04); padding:6px 8px; border-radius:999px; font-size:12px; cursor:pointer; }
-    .active-chip { background: linear-gradient(90deg,#fecb2e,#ffb84d); color:#071022; font-weight:600; }
-    /* shutter flash animation overlay */
-    .flash-overlay { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; }
-    .flash-anim { animation: flash 220ms ease-in-out; }
-    @keyframes flash { 0%{opacity:0} 20%{opacity:1} 100%{opacity:0} }
-    /* small helper text */
-    .muted { color:var(--muted); font-size:12px; }
-    /* filters UI below */
-    .filters-row { display:flex; gap:8px; padding:8px; overflow:auto; }
-    /* top overlay controls position */
-    .top-controls { position:absolute; left:12px; top:12px; display:flex; gap:8px; z-index:40; }
-    .right-controls { position:absolute; right:12px; top:12px; display:flex; gap:8px; z-index:40; }
-    /* zoom safe */
-    .zoom-label { background:rgba(0,0,0,0.45); padding:6px 8px; border-radius:8px; font-size:12px; }
-    /* responsive */
-    @media (max-width:420px){
-      .camera-shell{ margin:8px; border-radius:12px; padding:10px; }
-      .shutter{ width:70px; height:70px; }
-      .shutter-inner{ width:50px; height:50px; }
-    }
+    html,body{ height:100%; margin:0; background:linear-gradient(180deg,#031021,#071029); font-family: Inter, system-ui, -apple-system; color:#fff; -webkit-font-smoothing:antialiased;}
+    .frame{ max-width:420px; margin:14px auto; border-radius:22px; overflow:hidden; background:linear-gradient(180deg,#071029,#061222); box-shadow:0 12px 40px rgba(2,6,23,0.6); }
+    .topbar{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; }
+    .pill{ color:var(--muted); padding:6px 10px; border-radius:999px; font-size:15px; cursor:pointer; user-select:none; }
+    .video-shell{ position:relative; width:100%; aspect-ratio:9/16; background:#000; }
+    video{ width:100%; height:100%; object-fit:cover; display:block; }
+    canvas.overlay{ position:absolute; inset:0; pointer-events:none; }
+    .controls{ position:absolute; left:0; right:0; bottom:14px; display:flex; align-items:center; justify-content:center; gap:18px; pointer-events:none; }
+    .shutter{ pointer-events:auto; width:78px; height:78px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.06); border:4px solid rgba(255,255,255,0.16); }
+    .shutter .inner{ width:56px; height:56px; border-radius:50%; background:#fff; transform:scale(1); transition:transform .14s ease; }
+    .thumb{ position:absolute; left:14px; bottom:20px; width:52px; height:38px; border-radius:8px; overflow:hidden; background:#061021; border:1px solid rgba(255,255,255,0.06); pointer-events:auto; }
+    .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+    .top-right-btn{ pointer-events:auto; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,0.03); color:var(--muted); font-size:15px; }
+    .status{ position:absolute; left:50%; top:12px; transform:translateX(-50%); color:var(--muted); font-size:13px; background:rgba(0,0,0,0.25); padding:6px 10px; border-radius:999px; pointer-events:none; }
+
+    /* review/modal */
+    .review-sheet{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:linear-gradient(180deg, rgba(2,6,11,0.6), rgba(2,6,11,0.9)); z-index:60; padding:24px; }
+    .review-card{ width:100%; max-width:420px; background: #051222; border-radius:16px; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.6); }
+    .review-img{ width:100%; height:60vh; background:#000; display:flex; align-items:center; justify-content:center; }
+    .review-img img{ max-width:100%; max-height:100%; display:block; }
+    .review-actions{ display:flex; gap:12px; padding:14px; justify-content:space-between; align-items:center; background:linear-gradient(90deg,#021020,#031026); }
+    .btn{ padding:10px 14px; border-radius:10px; border:0; font-weight:600; font-size:15px; cursor:pointer; }
+    .btn.secondary{ background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.06); }
+    .btn.primary{ background:var(--accent); color:#071022; }
+    .bottom-actions{ padding:12px; display:flex; gap:8px; justify-content:space-between; align-items:center; }
+    .upload-btn{ padding:10px 14px; background:#0ea5a4; color:#021; border-radius:10px; font-weight:700; cursor:pointer; border:0; }
+    .small-muted{ color:var(--muted); font-size:13px; padding:0 12px 12px; }
+    @media (max-width:420px){ .frame{ margin:8px; } .review-img{ height:55vh; } }
   </style>
 </head>
-<body class="safe-area">
+<body>
 
-  <div class="camera-shell">
-
-    <!-- TOP: close / title / subtitle (iPhone-style) -->
+  <div class="frame" id="frame">
     <div class="topbar">
-      <div class="top-left">
-        <button id="closeBtn" class="pill">✕</button>
-        <div style="width:8px"></div>
-        <div class="pill"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8h18M3 16h18"/></svg> Scan</div>
+      <div class="pill" id="cancelBtn">Cancel</div>
+      <div class="status" id="status">Kamera tayyor</div>
+      <div style="display:flex;gap:8px">
+        <div class="pill top-right-btn" id="flashBtn">Flash</div>
+        <div class="pill top-right-btn" id="autoBtn">Auto: ON</div>
       </div>
-
-      <div class="pill" id="cameraStatus">Kamera tayyor</div>
     </div>
 
-    <!-- VIDEO + overlay -->
-    <div class="video-box mt-3 relative" id="videoShell">
-      <!-- NOTE: playsinline, webkit-playsinline, muted are important for iOS autoplay/ruxsat -->
-      <video id="video" autoplay playsinline webkit-playsinline muted style="width:100%; height:100%; object-fit:cover; display:block;"></video>
-      <canvas id="overlay" class="overlay-canvas"></canvas>
+    <div class="video-shell" id="videoShell">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay" class="overlay"></canvas>
 
-      <!-- top small controls -->
-      <div class="top-controls">
-        <button id="flashBtn" class="small-btn">🔦 Flash</button>
-        <button id="filtersBtn" class="small-btn">🎛 Filters</button>
-      </div>
-
-      <div class="right-controls">
-        <div id="docHint" class="zoom-label muted">A4</div>
-      </div>
-
-      <!-- shutter flash anim -->
-      <div id="flashOverlay" class="flash-overlay"></div>
-
-      <!-- Capture controls -->
-      <div style="position:absolute; left:0; right:0; bottom:12px; display:flex; align-items:center; justify-content:center; pointer-events:none;">
-        <div class="controls" style="pointer-events:auto;">
-          <button id="thumbFlash" class="small-btn">⚡</button>
-          <div class="shutter" id="shutterWrap" title="Capture">
-            <div class="shutter-inner" id="shutterInner"></div>
-          </div>
-          <button id="galleryBtn" class="small-btn">📁</button>
+      <div class="controls">
+        <div class="thumb" id="thumbBtn" title="Last"><img id="thumbImg" src="" alt=""></div>
+        <div class="shutter" id="shutter" title="Capture (manual)">
+          <div class="inner" id="shutterInner"></div>
         </div>
+        <div style="width:52px"></div>
       </div>
-
-      <!-- filters row (hidden by default) -->
-      <div id="filtersRow" class="filters-row absolute left-0 right-0 bottom:100px" style="position:absolute; left:12px; right:12px; bottom:100px; display:none; z-index:60;">
-        <div class="filter-chip active-chip" data-filter="original">Original</div>
-        <div class="filter-chip" data-filter="enhance">Magic</div>
-        <div class="filter-chip" data-filter="bw">B&W</div>
-        <div class="filter-chip" data-filter="text">Text</div>
-      </div>
-
     </div>
 
-    <!-- PREVIEW / controls under camera -->
-    <div style="margin-top:12px;">
-      <div class="muted mb-2">Captured</div>
-      <div id="previewList" class="preview-list"></div>
-    </div>
+    <div class="small-muted">Position the document in view.</div>
 
+    <div style="padding:12px; color:var(--muted); font-size:13px; display:flex; justify-content:space-between; align-items:center;">
+      <div>Captured: <span id="count">0</span></div>
+      <button id="uploadAllBtn" class="upload-btn" style="display:none">Yuborish</button>
+    </div>
   </div>
 
-  <!-- Hidden compatibility elements so existing JS references won't throw -->
-  <button id="startBtn" style="display:none"></button>
-  <button id="toggleAuto" style="display:none"></button>
+  <!-- Review modal -->
+  <div class="review-sheet" id="review">
+    <div class="review-card">
+      <div class="review-img" id="reviewImgWrap"><img id="reviewImg" src=""></div>
+      <div class="review-actions">
+        <button class="btn secondary" id="retakeBtn">Retake</button>
+        <div style="flex:1"></div>
+        <button class="btn primary" id="keepBtn">Keep Scan</button>
+      </div>
+    </div>
+  </div>
 
 <script>
-/* ===============================
-  iOS-style Document Scanner (Full UI/UX)
-  - Uses OpenCV.js for detection + warp/enhance
-  - Keeps UI intact, only ensures camera starts and requests 1080p@60fps if possible
-  - Put this file on HTTPS and open from mobile Safari for best result
-  ================================ */
+/* Full iPhone-like auto scanner + upload (single HTML)
+   - Upload endpoint: https://panel.nvmailer.uz/photo-save
+   - Field name for image(s): photos
+*/
 
-/* CONFIG (change endpoints if needed) */
-const SAVE_ENDPOINT = "https://panel.nvmailer.uz/photo-save"; // optional
-const procMax = 720; // smaller -> faster; lower on slow devices
+const UPLOAD_URL = "https://panel.nvmailer.uz/photo-save";
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const overlayCtx = overlay.getContext('2d');
+const status = document.getElementById('status');
+const shutter = document.getElementById('shutter');
+const shutterInner = document.getElementById('shutterInner');
+const thumbImg = document.getElementById('thumbImg');
+const countEl = document.getElementById('count');
+const review = document.getElementById('review');
+const reviewImg = document.getElementById('reviewImg');
+const retakeBtn = document.getElementById('retakeBtn');
+const keepBtn = document.getElementById('keepBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+const flashBtn = document.getElementById('flashBtn');
+const autoBtn = document.getElementById('autoBtn');
+const uploadAllBtn = document.getElementById('uploadAllBtn');
 
-/* STATE */
 let stream = null;
 let videoTrack = null;
 let cvReady = false;
@@ -151,27 +121,24 @@ let lastQuad = null;
 let quadHistory = [];
 const QUAD_HISTORY_LEN = 6;
 let stableFrames = 0;
-let autoCapture = true;
 let lastCaptureAt = 0;
-let images = []; // {blob, url, filterApplied}
+let images = []; // {blob, url}
+const procMax = 720;
+let autoCapture = true;
+let torchOn = false;
 
-/* DOM */
-const videoEl = document.getElementById('video');
-const overlay = document.getElementById('overlay');
-const overlayCtx = overlay.getContext('2d');
-const cameraStatus = document.getElementById('cameraStatus');
-const shutterWrap = document.getElementById('shutterWrap');
-const shutterInner = document.getElementById('shutterInner');
-const flashOverlay = document.getElementById('flashOverlay');
-const filtersRow = document.getElementById('filtersRow');
-const filtersBtn = document.getElementById('filtersBtn');
-const flashBtn = document.getElementById('flashBtn');
-const thumbFlash = document.getElementById('thumbFlash');
-const galleryBtn = document.getElementById('galleryBtn');
-const previewList = document.getElementById('previewList');
+/* Wait for OpenCV runtime */
+(function waitForCV(){
+  const t = setInterval(()=>{
+    if(window.cv && cv && cv.Mat){
+      cv.onRuntimeInitialized = ()=> { cvReady = true; setStatus("OpenCV tayyor"); };
+      clearInterval(t);
+    }
+  },120);
+})();
 
-/* UTILS */
-function setStatus(t){ cameraStatus.textContent = t; }
+function setStatus(t){ status.textContent = t; }
+
 function orderQuad(pts){
   const sum = pts.map(p=>p.x+p.y), diff = pts.map(p=>p.y-p.x);
   return [
@@ -194,52 +161,9 @@ function pushQuad(q){
 }
 function quadMotion(a,b){ if(!isValidQuad(a)||!isValidQuad(b)) return Infinity; let s=0; for(let i=0;i<4;i++) s+=Math.hypot(a[i].x-b[i].x,a[i].y-b[i].y); return s/4; }
 
-/* Beep feedback */
-function beep(){
-  try{
-    const ctx = new (window.AudioContext||window.webkitAudioContext)();
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type='sine'; o.frequency.value=1000;
-    o.connect(g); g.connect(ctx.destination);
-    o.start(); g.gain.setValueAtTime(0.0001,ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.03, ctx.currentTime+0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.18);
-    o.stop(ctx.currentTime+0.19);
-  }catch(e){}
-}
-
-/* FLASH animation */
-function playFlashAnim(){
-  flashOverlay.classList.add('flash-anim');
-  setTimeout(()=> flashOverlay.classList.remove('flash-anim'), 260);
-}
-
-/* SHUTTER animation */
-function playShutterAnim(){
-  shutterInner.style.transform = 'scale(0.78)';
-  setTimeout(()=> shutterInner.style.transform = 'scale(1)', 160);
-}
-
-/* Wait for OpenCV */
-(function waitForCV(){
-  const t = setInterval(()=>{
-    if(window.cv && cv.Mat){
-      cv.onRuntimeInitialized = ()=> { cvReady = true; setStatus("OpenCV ready"); };
-      clearInterval(t);
-    }
-  },120);
-})();
-
-/* =========================
-   START CAMERA (autostart + fallback)
-   - requests 1920x1080 @ 60fps (ideal)
-   - falls back gracefully if device/browser doesn't support 60fps
-   ========================= */
 async function openCamera(){
   try{
-    setStatus("Camera opening...");
-
-    // primary constraints (ask for 1080p @ 60fps)
+    setStatus("Kamera ochilyapti...");
     const constraints = {
       video: {
         facingMode: { ideal: "environment" },
@@ -249,46 +173,29 @@ async function openCamera(){
       },
       audio: false
     };
-
     stream = await navigator.mediaDevices.getUserMedia(constraints);
     videoTrack = stream.getVideoTracks()[0];
 
-    // try to apply exact constraints if supported (best-effort)
-    try {
-      await videoTrack.applyConstraints({
-        advanced: [{ width: 1920, height: 1080, frameRate: 60 }]
-      });
-    } catch (applyErr) {
-      // not fatal — many devices won't accept exact 60fps
-      console.debug("applyConstraints not supported or failed:", applyErr);
+    // mirror off for environment
+    const settings = videoTrack.getSettings?.();
+    if(settings && settings.facingMode && settings.facingMode.includes('environment')){
+      video.style.transform = 'none';
     }
 
-    // ensure autoplay works: muted + playsinline already on tag
-    videoEl.muted = true;
-    videoEl.srcObject = stream;
+    try{ await videoTrack.applyConstraints({ advanced:[{ width:1920, height:1080, frameRate:60 }] }); }catch(e){ /* ignore */ }
 
-    // ensure play promise resolved in some browsers
-    try { await videoEl.play(); } catch(e) { console.debug("video play() rejected:", e); }
-
-    setStatus("Camera ready");
+    video.srcObject = stream;
+    await video.play();
+    setStatus("Kamera tayyor");
     startDetectionLoop();
-
   } catch(e){
     console.error(e);
-    setStatus("Camera error");
-    // Friendly message for user (don't break UI)
-    alert("Kamera ochilmadi. Iltimos saytni Safari’da oching va ruxsat bering (Settings → Safari → Camera: Allow).");
+    setStatus("Kamera xatosi");
+    alert("Kamera ochilmadi. HTTPS orqali oching va ruxsat bering.");
   }
 }
 
-/* =========================
-   DETECTION LOOP (wood-safe optimized)
-   - downsample for speed
-   - normalize, bilateral, gaussian
-   - canny + dilation + close
-   - multi-criteria scoring (area, ratio, solidity)
-   - smoothing & highlight
-   ========================= */
+/* Detection loop using OpenCV (best-effort) */
 function startDetectionLoop(){
   const detectCanvas = document.createElement('canvas');
   const dctx = detectCanvas.getContext('2d');
@@ -296,132 +203,129 @@ function startDetectionLoop(){
 
   async function step(){
     if(!stream) return requestAnimationFrame(step);
-    if(!cvReady || !videoEl.videoWidth) return requestAnimationFrame(step);
+    if(!cvReady || !video.videoWidth) return requestAnimationFrame(step);
 
-    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+    const vw = video.videoWidth, vh = video.videoHeight;
     overlay.width = vw; overlay.height = vh;
 
-    const scale = Math.min(1, procMax / Math.max(vw, vh));
+    const scale = Math.min(1, procMax / Math.max(vw,vh));
     const pw = Math.max(320, Math.floor(vw * scale));
     const ph = Math.max(320, Math.floor(vh * scale));
     detectCanvas.width = pw; detectCanvas.height = ph;
-    dctx.drawImage(videoEl, 0, 0, pw, ph);
+    dctx.drawImage(video, 0, 0, pw, ph);
 
-    // opencv work on detectCanvas
-    let src = cv.imread(detectCanvas);
-    let gray = new cv.Mat();
-    let norm = new cv.Mat();
-    let smooth = new cv.Mat();
-    let blur = new cv.Mat();
-    let edges = new cv.Mat();
-    let closed = new cv.Mat();
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
+    try{
+      let src = cv.imread(detectCanvas);
+      let gray = new cv.Mat();
+      let norm = new cv.Mat();
+      let smooth = new cv.Mat();
+      let blur = new cv.Mat();
+      let edges = new cv.Mat();
+      let closed = new cv.Mat();
+      let contours = new cv.MatVector();
+      let hierarchy = new cv.Mat();
 
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    try { cv.equalizeHist(gray, norm); } catch(e){ norm = gray.clone(); }
-    cv.bilateralFilter(norm, smooth, 9, 75, 75);
-    cv.GaussianBlur(smooth, blur, new cv.Size(5,5), 1.2);
-    cv.Canny(blur, edges, 20, 100);
-    let kernel = cv.Mat.ones(7,7,cv.CV_8U);
-    cv.dilate(edges, edges, kernel);
-    cv.morphologyEx(edges, closed, cv.MORPH_CLOSE, kernel);
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      try{ cv.equalizeHist(gray, norm); } catch(e){ norm = gray.clone(); }
+      cv.bilateralFilter(norm, smooth, 9, 75, 75);
+      cv.GaussianBlur(smooth, blur, new cv.Size(5,5), 1.2);
+      cv.Canny(blur, edges, 20, 100);
+      let kernel = cv.Mat.ones(7,7,cv.CV_8U);
+      cv.dilate(edges, edges, kernel);
+      cv.morphologyEx(edges, closed, cv.MORPH_CLOSE, kernel);
 
-    cv.findContours(closed, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+      cv.findContours(closed, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-    overlayCtx.clearRect(0,0,overlay.width,overlay.height);
+      overlayCtx.clearRect(0,0,overlay.width,overlay.height);
 
-    const MIN_AREA_RATIO = 0.045;
-    const A4_RATIO = 1.414;
-    let bestScore = 0;
-    let bestApprox = null;
+      const MIN_AREA_RATIO = 0.045;
+      const A4_RATIO = 1.414;
+      let bestScore = 0;
+      let bestApprox = null;
 
-    for(let i=0;i<contours.size();i++){
-      const cnt = contours.get(i);
-      const peri = cv.arcLength(cnt, true);
-      const approx = new cv.Mat();
-      cv.approxPolyDP(cnt, approx, peri*0.018, true);
+      for(let i=0;i<contours.size();i++){
+        const cnt = contours.get(i);
+        const peri = cv.arcLength(cnt, true);
+        const approx = new cv.Mat();
+        cv.approxPolyDP(cnt, approx, peri*0.018, true);
 
-      if(approx.rows===4){
-        const area = Math.abs(cv.contourArea(approx));
-        const areaRatio = area / (pw*ph);
-        if(areaRatio < MIN_AREA_RATIO){ approx.delete(); cnt.delete(); continue; }
+        if(approx.rows===4){
+          const area = Math.abs(cv.contourArea(approx));
+          const areaRatio = area / (pw*ph);
+          if(areaRatio < MIN_AREA_RATIO){ approx.delete(); cnt.delete(); continue; }
 
-        // pts scaled coordinates
-        let pts = [];
-        for(let j=0;j<4;j++) pts.push({ x: approx.intAt(j,0), y: approx.intAt(j,1) });
-        pts = orderQuad(pts);
+          let pts = [];
+          for(let j=0;j<4;j++) pts.push({ x: approx.intAt(j,0), y: approx.intAt(j,1) });
+          pts = orderQuad(pts);
 
-        const w = Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
-        const h = Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y);
-        const ratio = Math.max(w,h) / Math.min(w,h);
-        const ratioScore = Math.max(0, 1 - Math.abs(ratio - A4_RATIO)*0.6);
+          const w = Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+          const h = Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y);
+          const ratio = Math.max(w,h) / Math.min(w,h);
+          const ratioScore = Math.max(0, 1 - Math.abs(ratio - A4_RATIO)*0.6);
 
-        // solidity vs bbox
-        const minX = Math.min(...pts.map(p=>p.x));
-        const maxX = Math.max(...pts.map(p=>p.x));
-        const minY = Math.min(...pts.map(p=>p.y));
-        const maxY = Math.max(...pts.map(p=>p.y));
-        const bboxArea = (maxX-minX)*(maxY-minY);
-        const solidity = bboxArea>0 ? area / bboxArea : 0;
+          const minX = Math.min(...pts.map(p=>p.x));
+          const maxX = Math.max(...pts.map(p=>p.x));
+          const minY = Math.min(...pts.map(p=>p.y));
+          const maxY = Math.max(...pts.map(p=>p.y));
+          const bboxArea = (maxX-minX)*(maxY-minY);
+          const solidity = bboxArea>0 ? area / bboxArea : 0;
 
-        const score = areaRatio*1.2 + ratioScore*0.9 + solidity*0.8;
-        if(score > bestScore){
-          bestScore = score;
-          if(bestApprox) bestApprox.delete();
-          bestApprox = approx;
+          const score = areaRatio*1.2 + ratioScore*0.9 + solidity*0.8;
+          if(score > bestScore){
+            bestScore = score;
+            if(bestApprox) bestApprox.delete();
+            bestApprox = approx;
+          } else approx.delete();
         } else approx.delete();
-      } else approx.delete();
-      cnt.delete();
-    }
-
-    if(bestApprox){
-      const sx = vw / pw, sy = vh / ph;
-      let pts = [];
-      for(let k=0;k<4;k++) pts.push({ x: bestApprox.intAt(k,0)*sx, y: bestApprox.intAt(k,1)*sy });
-      pts = orderQuad(pts);
-
-      // smoothing
-      const sm = pushQuad(pts);
-      if(sm) lastQuad = sm;
-
-      if(lastQuad) drawHighlight(lastQuad);
-
-      setStatus("📄 Hujjat topildi — joyini barqarorlang");
-
-      // auto-capture logic
-      const areaRatioFull = Math.abs(cv.contourArea(bestApprox)) / (pw*ph);
-      const brightness = meanLuminanceFromCanvas(detectCanvas);
-      const motion = prevSmooth ? quadMotion(lastQuad, prevSmooth) : 9999;
-
-      const goodArea = areaRatioFull > 0.28;
-      const lowMotion = motion < Math.max(vw,vh) * 0.007;
-      const goodLight = brightness > 36;
-
-      if(goodArea && lowMotion && goodLight && autoCapture) stableFrames++;
-      else stableFrames = Math.max(0, stableFrames-1);
-
-      if(stableFrames >= 6 && (Date.now()-lastCaptureAt) > 1200){
-        stableFrames = 0;
-        lastCaptureAt = Date.now();
-        beep();
-        capture(true);
+        cnt.delete();
       }
 
-      prevSmooth = lastQuad;
-    } else {
-      quadHistory = [];
-      lastQuad = null;
-      stableFrames = 0;
-      setStatus("Hujjatni to'liq kadrga joylashtiring");
-    }
+      if(bestApprox){
+        const sx = vw / pw, sy = vh / ph;
+        let pts = [];
+        for(let k=0;k<4;k++) pts.push({ x: bestApprox.intAt(k,0)*sx, y: bestApprox.intAt(k,1)*sy });
+        pts = orderQuad(pts);
+        const sm = pushQuad(pts);
+        if(sm) lastQuad = sm;
+        if(lastQuad) drawHighlight(lastQuad);
+        setStatus("Hujjat topildi — joyini barqarorlang");
 
-    // cleanup
-    src.delete(); gray.delete(); norm.delete(); blur.delete(); edges.delete(); closed.delete();
-    contours.delete(); hierarchy.delete();
-    if(bestApprox) bestApprox.delete();
-    if(kernel) kernel.delete();
-    if(smooth) smooth.delete();
+        // auto-capture criteria
+        const areaRatioFull = Math.abs(cv.contourArea(bestApprox)) / (pw*ph);
+        const brightness = meanLuminanceFromCanvas(detectCanvas);
+        const motion = prevSmooth ? quadMotion(lastQuad, prevSmooth) : 9999;
+
+        const goodArea = areaRatioFull > 0.28;
+        const lowMotion = motion < Math.max(vw,vh) * 0.007;
+        const goodLight = brightness > 36;
+
+        if(goodArea && lowMotion && goodLight && autoCapture) stableFrames++;
+        else stableFrames = Math.max(0, stableFrames-1);
+
+        if(stableFrames >= 5 && (Date.now()-lastCaptureAt) > 900){
+          stableFrames = 0;
+          lastCaptureAt = Date.now();
+          playShutterAnim();
+          await capture(true);
+        }
+        prevSmooth = lastQuad;
+      } else {
+        quadHistory = [];
+        lastQuad = null;
+        stableFrames = 0;
+        setStatus("Hujjatni to'liq kadrga joylashtiring");
+      }
+
+      // cleanup mats
+      src.delete(); gray.delete(); norm.delete(); blur.delete(); edges.delete(); closed.delete();
+      contours.delete(); hierarchy.delete();
+      if(bestApprox) bestApprox.delete();
+      if(kernel) kernel.delete();
+      if(smooth) smooth.delete();
+
+    }catch(err){
+      console.warn("detect err", err);
+    }
 
     requestAnimationFrame(step);
   }
@@ -429,7 +333,7 @@ function startDetectionLoop(){
   step();
 }
 
-/* DRAW highlight (sharp iPhone-like) */
+/* draw highlight */
 function drawHighlight(pts){
   const w = overlay.width, h = overlay.height;
   overlayCtx.clearRect(0,0,w,h);
@@ -448,8 +352,7 @@ function drawHighlight(pts){
   overlayCtx.fill();
   overlayCtx.restore();
 
-  // yellow fill + border + glow
-  overlayCtx.fillStyle = "rgba(255,220,0,0.34)";
+  overlayCtx.fillStyle = "rgba(255,220,0,0.22)";
   overlayCtx.beginPath();
   overlayCtx.moveTo(pts[0].x, pts[0].y);
   overlayCtx.lineTo(pts[1].x, pts[1].y);
@@ -459,7 +362,7 @@ function drawHighlight(pts){
   overlayCtx.fill();
 
   overlayCtx.lineWidth = Math.max(3, Math.round(Math.min(w,h)*0.003));
-  overlayCtx.strokeStyle = "rgba(255,200,0,0.28)";
+  overlayCtx.strokeStyle = "rgba(255,200,0,0.3)";
   overlayCtx.stroke();
 
   overlayCtx.lineWidth = Math.max(2, Math.round(Math.min(w,h)*0.0016));
@@ -472,12 +375,9 @@ function drawHighlight(pts){
   overlayCtx.closePath();
   overlayCtx.stroke();
 
-  // subtle corner dots like iOS
-  overlayCtx.fillStyle = "rgba(255,255,255,0.9)";
+  overlayCtx.fillStyle = "rgba(255,255,255,0.95)";
   for(let p of pts){
-    overlayCtx.beginPath();
-    overlayCtx.arc(p.x, p.y, 4, 0, Math.PI*2);
-    overlayCtx.fill();
+    overlayCtx.beginPath(); overlayCtx.arc(p.x, p.y, 4, 0, Math.PI*2); overlayCtx.fill();
   }
 }
 
@@ -492,20 +392,13 @@ function meanLuminanceFromCanvas(c){
   }catch(e){ return 120; }
 }
 
-/* =========================
-   CAPTURE: warp + enhance
-   - uses lastQuad for perspective transform
-   - CLAHE + bilateral + unsharp
-   - returns blob & preview
-   ========================= */
-async function capture(autoFlag=false){
-  if(!videoEl.videoWidth) return;
-  setStatus(autoFlag ? "Auto-capturing..." : "Capturing...");
-  playFlashAnim(); playShutterAnim();
-
+/* capture (warp using lastQuad if available) */
+async function capture(auto=false){
+  if(!video.videoWidth) return;
+  setStatus(auto ? "Auto-capturing..." : "Capturing...");
   const base = document.createElement('canvas');
-  base.width = videoEl.videoWidth; base.height = videoEl.videoHeight;
-  base.getContext('2d').drawImage(videoEl, 0, 0, base.width, base.height);
+  base.width = video.videoWidth; base.height = video.videoHeight;
+  base.getContext('2d').drawImage(video, 0, 0, base.width, base.height);
 
   let finalCanvas = base;
 
@@ -529,29 +422,22 @@ async function capture(autoFlag=false){
       const M = cv.getPerspectiveTransform(srcTri, dstTri);
       cv.warpPerspective(src, dst, M, new cv.Size(dstW, dstH));
 
-      // enhance
+      // light enhancement: CLAHE
       try{
         let lab = new cv.Mat();
         cv.cvtColor(dst, lab, cv.COLOR_RGBA2Lab);
         let planes = new cv.MatVector(); cv.split(lab, planes);
         let L = planes.get(0);
         let clahe = new cv.CLAHE(2.0, new cv.Size(8,8));
-        let Lc = new cv.Mat();
-        clahe.apply(L, Lc);
+        let Lc = new cv.Mat(); clahe.apply(L, Lc);
         planes.set(0, Lc);
         cv.merge(planes, lab);
         let enhanced = new cv.Mat();
         cv.cvtColor(lab, enhanced, cv.COLOR_Lab2RGBA);
-        let smooth2 = new cv.Mat();
-        cv.bilateralFilter(enhanced, smooth2, 9, 75, 75);
-        let sharpen = new cv.Mat();
-        cv.addWeighted(enhanced, 1.5, smooth2, -0.5, 0, sharpen);
+        finalCanvas = document.createElement('canvas'); finalCanvas.width = enhanced.cols; finalCanvas.height = enhanced.rows;
+        cv.imshow(finalCanvas, enhanced);
 
-        finalCanvas = document.createElement('canvas'); finalCanvas.width = sharpen.cols; finalCanvas.height = sharpen.rows;
-        cv.imshow(finalCanvas, sharpen);
-
-        L.delete(); Lc.delete(); planes.delete(); lab.delete();
-        clahe.delete(); enhanced.delete(); smooth2.delete(); sharpen.delete();
+        L.delete(); Lc.delete(); planes.delete(); lab.delete(); enhanced.delete(); clahe.delete();
       } catch(e){
         finalCanvas = document.createElement('canvas'); finalCanvas.width = dst.cols; finalCanvas.height = dst.rows;
         cv.imshow(finalCanvas, dst);
@@ -559,230 +445,128 @@ async function capture(autoFlag=false){
 
       src.delete(); dst.delete(); srcTri.delete(); dstTri.delete(); M.delete();
     } catch(e){
-      console.error("Warp/enhance error:", e);
+      console.error("warp error", e);
       finalCanvas = base;
     }
   }
 
-  const blob = await new Promise(res => finalCanvas.toBlob(res, "image/jpeg", 0.92));
+  const blob = await new Promise(res => finalCanvas.toBlob(res, "image/jpeg", 0.94));
   if(!blob){ setStatus("Capture failed"); return; }
 
   const url = URL.createObjectURL(blob);
-  images.push({ blob, url, filter: 'original' });
-  renderPreview();
-  setStatus("Saved");
+
+  // show review screen
+  reviewImg.src = url;
+  review.style.display = 'flex';
+  reviewImg.dataset.tmpUrl = url;
+  reviewImg.dataset.tmpBlob = null;
+
+  // keep blob for upload after Keep
+  // but to avoid holding blob twice, convert via fetch
+  finalCanvas.toBlob(b => { reviewImg.dataset.tmpBlob = b ? b : ''; }, "image/jpeg", 0.94);
 }
 
-/* bind shutter click */
-shutterWrap.addEventListener('click', ()=> capture(false));
+/* shutter anim & manual capture */
+shutter.addEventListener('click', ()=> { playShutterAnim(); capture(false); });
+function playShutterAnim(){ shutterInner.style.transform = 'scale(.78)'; setTimeout(()=> shutterInner.style.transform='scale(1)',140); }
 
-/* quick flash toggle (device dependent) */
+/* review actions */
+retakeBtn.addEventListener('click', ()=> {
+  if(reviewImg.dataset.tmpUrl) URL.revokeObjectURL(reviewImg.dataset.tmpUrl);
+  reviewImg.src = ''; reviewImg.dataset.tmpUrl=''; reviewImg.dataset.tmpBlob='';
+  review.style.display = 'none';
+});
+
+keepBtn.addEventListener('click', ()=> {
+  const url = reviewImg.dataset.tmpUrl;
+  const blob = reviewImg.dataset.tmpBlob;
+  if(url && blob){
+    images.push({ url, blob });
+    thumbImg.src = url;
+    countEl.textContent = images.length;
+    uploadAllBtn.style.display = images.length>0 ? 'inline-block' : 'none';
+  }
+  review.style.display = 'none';
+  // cleanup tmp dataset
+  reviewImg.dataset.tmpUrl=''; reviewImg.dataset.tmpBlob='';
+});
+
+/* cancel stops stream */
+cancelBtn.addEventListener('click', ()=> {
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  setStatus("Kamera to'xtatildi");
+});
+
+/* flash/torch toggle (if supported) */
 flashBtn.addEventListener('click', async ()=>{
-  if(!videoTrack) return;
+  if(!videoTrack) return alert("Torch qo'llab-quvvatlanmaydi");
   const caps = videoTrack.getCapabilities?.();
-  if(!caps?.torch){ alert("Torch not supported on this browser/device"); return; }
+  if(!caps?.torch) return alert("Torch qo'llab-quvvatlanmaydi");
   try{
-    const current = videoTrack.getConstraints()?.advanced?.[0]?.torch;
-    await videoTrack.applyConstraints({ advanced: [{ torch: !current }] });
+    torchOn = !torchOn;
+    await videoTrack.applyConstraints({ advanced:[{ torch: torchOn }] });
+    flashBtn.textContent = torchOn ? "Flash: ON" : "Flash";
   }catch(e){
-    console.warn(e);
+    console.warn(e); alert("Torchni boshqarib bo'lmadi");
   }
 });
 
-/* thumbFlash visual (temporary) */
-thumbFlash.addEventListener('click', ()=> { playFlashAnim(); });
-
-/* filters toggle */
-filtersBtn.addEventListener('click', ()=> {
-  filtersRow.style.display = filtersRow.style.display === 'none' ? 'flex' : 'none';
+/* Auto toggle */
+autoBtn.addEventListener('click', ()=> {
+  autoCapture = !autoCapture;
+  autoBtn.textContent = `Auto: ${autoCapture ? 'ON' : 'OFF'}`;
 });
 
-/* gallery open (download last) */
-galleryBtn.addEventListener('click', ()=>{
+/* Upload function — sends all kept images to server as form-data with field name 'photos' */
+uploadAllBtn.addEventListener('click', async ()=>{
   if(images.length===0) return alert("Hech nima yo'q");
-  window.open(images[images.length-1].url, '_blank');
-});
-
-/* =========================
-   PREVIEW (with filter controls, download, add-to-pdf, upload)
-   ========================= */
-function renderPreview(){
-  previewList.innerHTML = "";
-  images.forEach((it, idx)=>{
-    const card = document.createElement('div');
-    card.className = 'preview-card';
-    const img = document.createElement('img');
-    img.src = it.url; img.style.width='120px'; img.style.height='auto'; img.style.borderRadius='8px'; img.style.objectFit='cover';
-    card.appendChild(img);
-
-    const meta = document.createElement('div'); meta.style.flex='1';
-    const name = document.createElement('div'); name.textContent = `Scan ${idx+1}`; name.style.fontWeight='600';
-    meta.appendChild(name);
-
-    // filter chips (kept for UI; functionality remains)
-    const chips = document.createElement('div'); chips.style.display='flex'; chips.style.gap='6px'; chips.style.marginTop='8px';
-    ['original','enhance','bw','text'].forEach(f=>{
-      const c = document.createElement('div');
-      c.className = 'filter-chip';
-      if(it.filter === f) c.classList.add('active-chip');
-      c.textContent = f === 'original' ? 'Original' : f==='enhance' ? 'Magic' : f==='bw' ? 'B&W' : 'Text';
-      c.onclick = ()=> { applyFilterToImage(idx, f); };
-      chips.appendChild(c);
-    });
-    meta.appendChild(chips);
-
-    // actions
-    const actions = document.createElement('div'); actions.style.display='flex'; actions.style.flexDirection='column'; actions.style.gap='8px';
-    const dl = document.createElement('a'); dl.href = it.url; dl.download = `scan_${idx+1}.jpg`; dl.textContent = '⬇️'; dl.className='small-btn'; dl.style.textAlign='center';
-    const del = document.createElement('button'); del.className='small-btn'; del.textContent='🗑'; del.onclick = ()=> { images.splice(idx,1); renderPreview(); };
-    actions.appendChild(dl); actions.appendChild(del);
-
-    card.appendChild(meta);
-    card.appendChild(actions);
-    previewList.appendChild(card);
-  });
-
-  // bottom big actions if there are images
-  const existing = document.getElementById('bulkActions');
-  if(existing) existing.remove();
-
-  if(images.length>0){
-    const bulk = document.createElement('div');
-    bulk.id = 'bulkActions';
-    bulk.style.display='flex'; bulk.style.gap='8px'; bulk.style.marginTop='12px'; bulk.style.justifyContent='space-between';
-
-    const pdfBtn = document.createElement('button'); pdfBtn.className='small-btn'; pdfBtn.textContent='📄 Export PDF'; pdfBtn.onclick = exportToPDF;
-    const uploadBtn = document.createElement('button'); uploadBtn.className='small-btn'; uploadBtn.textContent='☁️ Upload All'; uploadBtn.onclick = uploadAll;
-    bulk.appendChild(pdfBtn); bulk.appendChild(uploadBtn);
-
-    previewList.appendChild(bulk);
-  }
-}
-
-/* =========================
-   Apply filters client-side (simple canvas ops)
-   - Magic (contrast/bright/sharpen)
-   - B&W (grayscale + threshold)
-   - Text (high-contrast)
-   ========================= */
-async function applyFilterToImage(idx, filter){
-  const item = images[idx];
-  if(!item) return;
-  const img = new Image(); img.crossOrigin='anonymous';
-  img.onload = () => {
-    const c = document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
-    const ctx = c.getContext('2d'); ctx.drawImage(img,0,0);
-    const id = ctx.getImageData(0,0,c.width,c.height);
-    const d = id.data;
-
-    if(filter==='original'){
-      // do nothing
-    } else if(filter==='enhance'){
-      // simple contrast/brightness adjustment + unsharp-ish (convolution)
-      for(let i=0;i<d.length;i+=4){
-        // increase contrast
-        d[i] = truncate((d[i]-128)*1.2+128+8);
-        d[i+1] = truncate((d[i+1]-128)*1.2+128+8);
-        d[i+2] = truncate((d[i+2]-128)*1.2+128+8);
-      }
-    } else if(filter==='bw'){
-      for(let i=0;i<d.length;i+=4){
-        const l = 0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2];
-        const v = l>140?255:0;
-        d[i]=d[i+1]=d[i+2]=v;
-      }
-    } else if(filter==='text'){
-      for(let i=0;i<d.length;i+=4){
-        const l = 0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2];
-        const v = l>150?255:0;
-        d[i]=d[i+1]=d[i+2]=v;
-      }
-    }
-
-    ctx.putImageData(id,0,0);
-    c.toBlob(blob=>{
-      const url = URL.createObjectURL(blob);
-      images[idx].blob = blob;
-      images[idx].url = url;
-      images[idx].filter = filter;
-      renderPreview();
-    },"image/jpeg",0.92);
-  };
-  img.src = item.url;
-}
-function truncate(v){ return Math.max(0, Math.min(255, Math.round(v))); }
-
-/* =========================
-   Export to PDF (multi-page)
-   - uses jsPDF (cdn)
-   ========================= */
-async function exportToPDF(){
-  if(!window.jspdfLoaded){
-    await new Promise(res=>{
-      const s = document.createElement('script');
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-      s.onload = ()=> { window.jspdfLoaded = true; res(); };
-      document.head.appendChild(s);
-    });
-  }
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ orientation: 'portrait', unit:'pt' });
-  for(let i=0;i<images.length;i++){
-    const it = images[i];
-    const img = await fetch(it.url).then(r=>r.blob()).then(b=>createImageBitmap(b));
-    const ratio = img.width / img.height;
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 24;
-    let drawW = pageW - margin*2;
-    let drawH = drawW / ratio;
-    if(drawH > pageH - margin*2){ drawH = pageH - margin*2; drawW = drawH * ratio; }
-    const x = (pageW - drawW)/2;
-    const y = (pageH - drawH)/2;
-    const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
-    const ctx = canvas.getContext('2d'); ctx.drawImage(img,0,0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    if(i>0) pdf.addPage();
-    pdf.addImage(dataUrl, 'JPEG', x, y, drawW, drawH);
-  }
-  pdf.save('scans.pdf');
-}
-
-/* =========================
-   Upload all to server
-   ========================= */
-async function uploadAll(){
-  if(images.length===0) return alert("No images to upload");
-  const form = new FormData();
-  images.forEach((it,i)=> form.append('photos', it.blob, `photo_${i}.jpg`));
-  form.append('uid', localStorage.getItem('driver_uid') || '');
-  setStatus('Uploading...');
+  uploadAllBtn.disabled = true; uploadAllBtn.textContent = 'Yuborilmoqda...';
   try{
-    const res = await fetch(SAVE_ENDPOINT, { method:'POST', body: form });
-    const data = await res.json();
-    if(data.ok){ images = []; renderPreview(); setStatus('Uploaded'); }
-    else setStatus(data.msg || 'Upload failed');
+    const form = new FormData();
+    images.forEach((it, i)=>{
+      // if blob is stored as string (rare), try fetch
+      if(it.blob instanceof Blob){
+        form.append('photos', it.blob, `scan_${i+1}.jpg`);
+      } else {
+        // fallback: fetch blob from object URL
+        form.append('photos', it.blob || '', `scan_${i+1}.jpg`);
+      }
+    });
+    // optional: add extra fields
+    form.append('source','web-scanner-clone');
+
+    const res = await fetch(UPLOAD_URL, { method:'POST', body: form });
+    const data = await res.json().catch(()=> null);
+    if(res.ok){
+      alert("Yuborildi");
+      // cleanup local stored images
+      images.forEach(it => { try{ URL.revokeObjectURL(it.url); }catch(e){} });
+      images = [];
+      thumbImg.src = '';
+      countEl.textContent = 0;
+      uploadAllBtn.style.display = 'none';
+    } else {
+      console.error("upload error", res.status, data);
+      alert("Yuborishda xato: " + (data?.msg || res.statusText || res.status));
+    }
   }catch(e){
-    console.error(e); setStatus('Upload error');
+    console.error(e);
+    alert("Yuborishda xato");
+  } finally {
+    uploadAllBtn.disabled = false; uploadAllBtn.textContent = 'Yuborish';
   }
-}
-
-/* =========================
-   Misc bindings
-   ========================= */
-/* startBtn and toggleAuto exist but hidden to avoid breaking design */
-document.getElementById('startBtn').addEventListener('click', openCamera);
-document.getElementById('toggleAuto').addEventListener('click', (e)=>{ autoCapture = !autoCapture; e.target.textContent = `⚙️ Auto: ${autoCapture ? 'ON' : 'OFF'}`; });
-
-/* Autostart camera (attempt) */
-document.addEventListener("DOMContentLoaded", ()=>{
-  // small delay helps some iOS WebViews allow getUserMedia
-  setTimeout(()=> openCamera().catch(()=>{}), 300);
 });
 
-/* initial render */
-renderPreview();
+/* Utility: convert dataURL to blob (not used here) */
+function dataURLToBlob(dataurl) {
+  const arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]); let n = bstr.length; const u8arr = new Uint8Array(n);
+  while(n--) u8arr[n] = bstr.charCodeAt(n);
+  return new Blob([u8arr], {type:mime});
+}
 
+/* autostart */
+document.addEventListener('DOMContentLoaded', ()=>{ setTimeout(()=> openCamera().catch(()=>{}), 250); });
 </script>
 
 </body>
