@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>iOS-Style Document Scanner — UI/UX Clone</title>
 
+  <!-- Permissions policy helps some WebViews / browsers allow camera -->
+  <meta http-equiv="Permissions-Policy" content="camera=(self)">
+
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -78,7 +81,8 @@
 
     <!-- VIDEO + overlay -->
     <div class="video-box mt-3 relative" id="videoShell">
-      <video id="video" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover; display:block;"></video>
+      <!-- NOTE: playsinline, webkit-playsinline, muted are important for iOS autoplay/ruxsat -->
+      <video id="video" autoplay playsinline webkit-playsinline muted style="width:100%; height:100%; object-fit:cover; display:block;"></video>
       <canvas id="overlay" class="overlay-canvas"></canvas>
 
       <!-- top small controls -->
@@ -123,11 +127,15 @@
 
   </div>
 
+  <!-- Hidden compatibility elements so existing JS references won't throw -->
+  <button id="startBtn" style="display:none"></button>
+  <button id="toggleAuto" style="display:none"></button>
+
 <script>
 /* ===============================
   iOS-style Document Scanner (Full UI/UX)
   - Uses OpenCV.js for detection + warp/enhance
-  - iPhone-style UI: flash, filters, shutter animation, preview, download, PDF export & upload
+  - Keeps UI intact, only ensures camera starts and requests 1080p@60fps if possible
   - Put this file on HTTPS and open from mobile Safari for best result
   ================================ */
 
@@ -223,22 +231,53 @@ function playShutterAnim(){
 })();
 
 /* =========================
-   START CAMERA
+   START CAMERA (autostart + fallback)
+   - requests 1920x1080 @ 60fps (ideal)
+   - falls back gracefully if device/browser doesn't support 60fps
    ========================= */
 async function openCamera(){
   try{
     setStatus("Camera opening...");
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+
+    // primary constraints (ask for 1080p @ 60fps)
+    const constraints = {
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 60, max: 60 }
+      },
       audio: false
-    });
+    };
+
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
     videoTrack = stream.getVideoTracks()[0];
+
+    // try to apply exact constraints if supported (best-effort)
+    try {
+      await videoTrack.applyConstraints({
+        advanced: [{ width: 1920, height: 1080, frameRate: 60 }]
+      });
+    } catch (applyErr) {
+      // not fatal — many devices won't accept exact 60fps
+      console.debug("applyConstraints not supported or failed:", applyErr);
+    }
+
+    // ensure autoplay works: muted + playsinline already on tag
+    videoEl.muted = true;
     videoEl.srcObject = stream;
+
+    // ensure play promise resolved in some browsers
+    try { await videoEl.play(); } catch(e) { console.debug("video play() rejected:", e); }
+
     setStatus("Camera ready");
     startDetectionLoop();
+
   } catch(e){
-    setStatus("Camera error");
     console.error(e);
+    setStatus("Camera error");
+    // Friendly message for user (don't break UI)
+    alert("Kamera ochilmadi. Iltimos saytni Safari’da oching va ruxsat bering (Settings → Safari → Camera: Allow).");
   }
 }
 
@@ -580,7 +619,7 @@ function renderPreview(){
     const name = document.createElement('div'); name.textContent = `Scan ${idx+1}`; name.style.fontWeight='600';
     meta.appendChild(name);
 
-    // filter chips
+    // filter chips (kept for UI; functionality remains)
     const chips = document.createElement('div'); chips.style.display='flex'; chips.style.gap='6px'; chips.style.marginTop='8px';
     ['original','enhance','bw','text'].forEach(f=>{
       const c = document.createElement('div');
@@ -604,7 +643,6 @@ function renderPreview(){
   });
 
   // bottom big actions if there are images
-  // remove existing bottom actions if any
   const existing = document.getElementById('bulkActions');
   if(existing) existing.remove();
 
@@ -679,7 +717,6 @@ function truncate(v){ return Math.max(0, Math.min(255, Math.round(v))); }
    - uses jsPDF (cdn)
    ========================= */
 async function exportToPDF(){
-  // load jsPDF library dynamically
   if(!window.jspdfLoaded){
     await new Promise(res=>{
       const s = document.createElement('script');
@@ -696,14 +733,12 @@ async function exportToPDF(){
     const ratio = img.width / img.height;
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    // fit into page with margin
     const margin = 24;
     let drawW = pageW - margin*2;
     let drawH = drawW / ratio;
     if(drawH > pageH - margin*2){ drawH = pageH - margin*2; drawW = drawH * ratio; }
     const x = (pageW - drawW)/2;
     const y = (pageH - drawH)/2;
-    // draw image as dataURL
     const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
     const ctx = canvas.getContext('2d'); ctx.drawImage(img,0,0);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -735,8 +770,15 @@ async function uploadAll(){
 /* =========================
    Misc bindings
    ========================= */
+/* startBtn and toggleAuto exist but hidden to avoid breaking design */
 document.getElementById('startBtn').addEventListener('click', openCamera);
 document.getElementById('toggleAuto').addEventListener('click', (e)=>{ autoCapture = !autoCapture; e.target.textContent = `⚙️ Auto: ${autoCapture ? 'ON' : 'OFF'}`; });
+
+/* Autostart camera (attempt) */
+document.addEventListener("DOMContentLoaded", ()=>{
+  // small delay helps some iOS WebViews allow getUserMedia
+  setTimeout(()=> openCamera().catch(()=>{}), 300);
+});
 
 /* initial render */
 renderPreview();
