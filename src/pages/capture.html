@@ -238,7 +238,7 @@ function startDetectionLoop(){
 
       overlayCtx.clearRect(0,0,overlay.width,overlay.height);
 
-      const MIN_AREA_RATIO = 0.045;
+      const MIN_AREA_RATIO = 0.02; // yumshatildi
       const A4_RATIO = 1.414;
       let bestScore = 0;
       let bestApprox = null;
@@ -261,7 +261,8 @@ function startDetectionLoop(){
           const w = Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
           const h = Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y);
           const ratio = Math.max(w,h) / Math.min(w,h);
-          const ratioScore = Math.max(0, 1 - Math.abs(ratio - A4_RATIO)*0.6);
+          // ratiolar juda chetga chiqmasa qabul qiling
+          if(ratio < 1.1 || ratio > 2.2){ approx.delete(); cnt.delete(); continue; }
 
           const minX = Math.min(...pts.map(p=>p.x));
           const maxX = Math.max(...pts.map(p=>p.x));
@@ -270,7 +271,7 @@ function startDetectionLoop(){
           const bboxArea = (maxX-minX)*(maxY-minY);
           const solidity = bboxArea>0 ? area / bboxArea : 0;
 
-          const score = areaRatio*1.2 + ratioScore*0.9 + solidity*0.8;
+          const score = areaRatio*1.2 + (1 - Math.abs(ratio - A4_RATIO))*0.8 + solidity*0.6;
           if(score > bestScore){
             bestScore = score;
             if(bestApprox) bestApprox.delete();
@@ -290,19 +291,19 @@ function startDetectionLoop(){
         if(lastQuad) drawHighlight(lastQuad);
         setStatus("Hujjat topildi — joyini barqarorlang");
 
-        // auto-capture criteria
+        // auto-capture criteria (yumshatildi)
         const areaRatioFull = Math.abs(cv.contourArea(bestApprox)) / (pw*ph);
         const brightness = meanLuminanceFromCanvas(detectCanvas);
         const motion = prevSmooth ? quadMotion(lastQuad, prevSmooth) : 9999;
 
-        const goodArea = areaRatioFull > 0.28;
-        const lowMotion = motion < Math.max(vw,vh) * 0.007;
-        const goodLight = brightness > 36;
+        const goodArea = areaRatioFull > 0.12; // yumshatildi
+        const lowMotion = motion < Math.max(vw,vh) * 0.02; // biroz bo'shatildi
+        const goodLight = brightness > 20;
 
         if(goodArea && lowMotion && goodLight && autoCapture) stableFrames++;
         else stableFrames = Math.max(0, stableFrames-1);
 
-        if(stableFrames >= 5 && (Date.now()-lastCaptureAt) > 900){
+        if(stableFrames >= 2 && (Date.now()-lastCaptureAt) > 700){
           stableFrames = 0;
           lastCaptureAt = Date.now();
           playShutterAnim();
@@ -450,6 +451,7 @@ async function capture(auto=false){
     }
   }
 
+  // get blob and object URL
   const blob = await new Promise(res => finalCanvas.toBlob(res, "image/jpeg", 0.94));
   if(!blob){ setStatus("Capture failed"); return; }
 
@@ -459,11 +461,7 @@ async function capture(auto=false){
   reviewImg.src = url;
   review.style.display = 'flex';
   reviewImg.dataset.tmpUrl = url;
-  reviewImg.dataset.tmpBlob = null;
-
-  // keep blob for upload after Keep
-  // but to avoid holding blob twice, convert via fetch
-  finalCanvas.toBlob(b => { reviewImg.dataset.tmpBlob = b ? b : ''; }, "image/jpeg", 0.94);
+  reviewImg.dataset.tmpBlob = ''; // not used; we'll fetch blob from URL to be safe
 }
 
 /* shutter anim & manual capture */
@@ -477,18 +475,34 @@ retakeBtn.addEventListener('click', ()=> {
   review.style.display = 'none';
 });
 
-keepBtn.addEventListener('click', ()=> {
+keepBtn.addEventListener('click', async () => {
   const url = reviewImg.dataset.tmpUrl;
-  const blob = reviewImg.dataset.tmpBlob;
-  if(url && blob){
-    images.push({ url, blob });
-    thumbImg.src = url;
-    countEl.textContent = images.length;
-    uploadAllBtn.style.display = images.length>0 ? 'inline-block' : 'none';
+  if(url){
+      // ensure we have a Blob (fetch the object URL)
+      try{
+        const b = await fetch(url).then(r=>r.blob());
+        images.push({
+          url,
+          blob: b,
+          keptAt: Date.now()
+        });
+      }catch(e){
+        // fallback: try converting canvas data -> blob (rare)
+        alert("Rasmni olishda xatolik yuz berdi");
+        return;
+      }
+
+      thumbImg.src = url;
+      countEl.textContent = images.length;
+      review.style.display = 'none';
+      reviewImg.dataset.tmpUrl = '';
+      reviewImg.src = '';
+
+      // show upload button if >=1
+      if(images.length>0){
+        uploadAllBtn.style.display = 'inline-block';
+      }
   }
-  review.style.display = 'none';
-  // cleanup tmp dataset
-  reviewImg.dataset.tmpUrl=''; reviewImg.dataset.tmpBlob='';
 });
 
 /* cancel stops stream */
@@ -523,23 +537,31 @@ uploadAllBtn.addEventListener('click', async ()=>{
   uploadAllBtn.disabled = true; uploadAllBtn.textContent = 'Yuborilmoqda...';
   try{
     const form = new FormData();
-    images.forEach((it, i)=>{
-      // if blob is stored as string (rare), try fetch
-      if(it.blob instanceof Blob){
-        form.append('photos', it.blob, `scan_${i+1}.jpg`);
-      } else {
-        // fallback: fetch blob from object URL
-        form.append('photos', it.blob || '', `scan_${i+1}.jpg`);
+
+    // ensure every entry is a Blob; if not, fetch from URL
+    for(let i=0;i<images.length;i++){
+      const it = images[i];
+      let blobToSend = it.blob;
+      if(!(blobToSend instanceof Blob)){
+        // try fetch from object URL
+        try{
+          blobToSend = await fetch(it.url).then(r=>r.blob());
+        }catch(e){
+          console.warn("Could not fetch blob for", it.url, e);
+          continue; // skip this image
+        }
       }
-    });
-    // optional: add extra fields
+      form.append('photos', blobToSend, `scan_${i+1}.jpg`);
+    }
+
+    // optional metadata
     form.append('source','web-scanner-clone');
 
     const res = await fetch(UPLOAD_URL, { method:'POST', body: form });
     const data = await res.json().catch(()=> null);
     if(res.ok){
       alert("Yuborildi");
-      // cleanup local stored images
+      // cleanup local stored images & object URLs
       images.forEach(it => { try{ URL.revokeObjectURL(it.url); }catch(e){} });
       images = [];
       thumbImg.src = '';
@@ -551,13 +573,13 @@ uploadAllBtn.addEventListener('click', async ()=>{
     }
   }catch(e){
     console.error(e);
-    alert("Yuborishda xato");
+    alert("Yuborishda xato: " + (e.message || e));
   } finally {
     uploadAllBtn.disabled = false; uploadAllBtn.textContent = 'Yuborish';
   }
 });
 
-/* Utility: convert dataURL to blob (not used here) */
+/* Utility: convert dataURL to blob (not used here but handy) */
 function dataURLToBlob(dataurl) {
   const arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1];
   const bstr = atob(arr[1]); let n = bstr.length; const u8arr = new Uint8Array(n);
